@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/auth';
 import { query } from '@/lib/bigquery';
 import { getDateRange, calculateROAS } from '@/lib/utils';
+import {
+  SummaryQuerySchema,
+  parseQueryParams,
+  formatValidationErrors,
+} from '@/lib/validations';
 
 export async function GET(request: NextRequest) {
   const authResult = await authenticateRequest(request);
@@ -15,11 +20,25 @@ export async function GET(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const profileId = searchParams.get('profileId') || 'default';
-    const dateRangeParam = searchParams.get('dateRange') || 'last30days';
-    const compareWith = searchParams.get('compareWith'); // e.g., 'previousPeriod'
 
-    const { startDate, endDate } = getDateRange(dateRangeParam as Parameters<typeof getDateRange>[0]);
+    // Validate query parameters
+    const queryParams = parseQueryParams(searchParams);
+    const validationResult = SummaryQuerySchema.safeParse(queryParams);
+
+    if (!validationResult.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid query parameters',
+          details: formatValidationErrors(validationResult.error),
+        },
+        { status: 400 }
+      );
+    }
+
+    const { profileId = 'default', dateRange: dateRangeParam, compareWith } = validationResult.data;
+
+    const { startDate, endDate } = getDateRange(dateRangeParam);
 
     // Current period summary
     const currentPeriodSql = `

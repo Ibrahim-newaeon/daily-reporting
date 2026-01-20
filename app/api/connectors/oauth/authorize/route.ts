@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Platform } from '@/lib/types';
+import { createSignedState } from '@/lib/security';
 
 const OAUTH_CONFIGS: Record<Platform, {
   authUrl: string;
@@ -59,10 +60,9 @@ export async function GET(request: NextRequest) {
   const config = OAUTH_CONFIGS[platform];
   const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/connectors/oauth/callback`;
 
-  // Create state parameter with platform and return URL
-  const state = Buffer.from(
-    JSON.stringify({ platform, returnUrl })
-  ).toString('base64');
+  // Create cryptographically signed state parameter to prevent CSRF attacks
+  // State expires after 10 minutes
+  const state = createSignedState({ platform, returnUrl }, 600000);
 
   // Build OAuth URL based on platform
   let authUrl: URL;

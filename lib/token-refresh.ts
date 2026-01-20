@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { getAdminDb } from './firebase';
 import { Platform, PlatformConnection } from './types';
+import { encryptToken, decryptToken, isEncryptedToken } from './security';
 
 interface TokenRefreshResult {
   success: boolean;
@@ -153,11 +154,27 @@ export async function getValidAccessToken(
     return null;
   }
 
+  // Decrypt tokens if they are encrypted
+  let accessToken = connection.accessToken;
+  let refreshToken = connection.refreshToken;
+
+  if (connection.tokenEncrypted || isEncryptedToken(accessToken)) {
+    try {
+      accessToken = decryptToken(accessToken);
+      if (refreshToken) {
+        refreshToken = decryptToken(refreshToken);
+      }
+    } catch (error) {
+      console.error(`Failed to decrypt tokens for ${platform}:`, error);
+      return null;
+    }
+  }
+
   // Check if token is still valid
   if (!isTokenExpired(connection.expiresAt)) {
     return {
-      accessToken: connection.accessToken,
-      refreshToken: connection.refreshToken,
+      accessToken,
+      refreshToken,
     };
   }
 
@@ -166,8 +183,8 @@ export async function getValidAccessToken(
 
   // Meta uses access token for refresh, others use refresh token
   const tokenToRefresh = platform === 'meta'
-    ? connection.accessToken
-    : connection.refreshToken;
+    ? accessToken
+    : refreshToken;
 
   if (!tokenToRefresh) {
     console.error(`No refresh token available for ${platform}`);
@@ -189,10 +206,16 @@ export async function getValidAccessToken(
     return null;
   }
 
+  // Encrypt new tokens before storing
+  const encryptedAccessToken = encryptToken(refreshResult.accessToken);
+  const newRefreshToken = refreshResult.refreshToken || refreshToken;
+  const encryptedRefreshToken = newRefreshToken ? encryptToken(newRefreshToken) : null;
+
   // Update tokens in Firestore
   await adminDb.collection('users').doc(userId).update({
-    [`connectedAccounts.${platform}.accessToken`]: refreshResult.accessToken,
-    [`connectedAccounts.${platform}.refreshToken`]: refreshResult.refreshToken || connection.refreshToken,
+    [`connectedAccounts.${platform}.accessToken`]: encryptedAccessToken,
+    [`connectedAccounts.${platform}.refreshToken`]: encryptedRefreshToken,
+    [`connectedAccounts.${platform}.tokenEncrypted`]: true,
     [`connectedAccounts.${platform}.expiresAt`]: refreshResult.expiresAt,
     [`connectedAccounts.${platform}.expired`]: false,
     [`connectedAccounts.${platform}.needsReauth`]: false,
@@ -203,7 +226,7 @@ export async function getValidAccessToken(
 
   return {
     accessToken: refreshResult.accessToken,
-    refreshToken: refreshResult.refreshToken,
+    refreshToken: refreshResult.refreshToken || refreshToken,
   };
 }
 
@@ -235,15 +258,32 @@ export async function withTokenRefresh<T>(
       const connection = userDoc.data()?.connectedAccounts?.[platform];
 
       if (connection?.refreshToken) {
+        // Decrypt tokens if encrypted
+        let storedAccessToken = connection.accessToken;
+        let storedRefreshToken = connection.refreshToken;
+
+        if (connection.tokenEncrypted || isEncryptedToken(storedAccessToken)) {
+          try {
+            storedAccessToken = decryptToken(storedAccessToken);
+            if (storedRefreshToken) {
+              storedRefreshToken = decryptToken(storedRefreshToken);
+            }
+          } catch {
+            throw new Error('Failed to decrypt tokens for refresh');
+          }
+        }
+
         const refreshResult = await refreshPlatformToken(
           platform,
-          platform === 'meta' ? connection.accessToken : connection.refreshToken
+          platform === 'meta' ? storedAccessToken : storedRefreshToken
         );
 
         if (refreshResult.success && refreshResult.accessToken) {
-          // Update and retry
+          // Encrypt and update
+          const encryptedNewToken = encryptToken(refreshResult.accessToken);
           await adminDb.collection('users').doc(userId).update({
-            [`connectedAccounts.${platform}.accessToken`]: refreshResult.accessToken,
+            [`connectedAccounts.${platform}.accessToken`]: encryptedNewToken,
+            [`connectedAccounts.${platform}.tokenEncrypted`]: true,
             [`connectedAccounts.${platform}.expiresAt`]: refreshResult.expiresAt,
             updatedAt: new Date(),
           });

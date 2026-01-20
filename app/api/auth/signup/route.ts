@@ -1,8 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminAuth } from '@/lib/firebase';
 import { createUser } from '@/lib/auth';
+import {
+  checkRateLimit,
+  RateLimits,
+  getClientIP,
+  validatePassword,
+  validateEmail,
+} from '@/lib/security';
 
 export async function POST(request: NextRequest) {
+  // Apply strict rate limiting to prevent abuse
+  const clientIP = getClientIP(request.headers);
+  const rateLimit = checkRateLimit(
+    `signup:${clientIP}`,
+    RateLimits.AUTH_SIGNUP.limit,
+    RateLimits.AUTH_SIGNUP.windowMs
+  );
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Too many signup attempts. Please try again later.',
+      },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(rateLimit.retryAfter || 60),
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': String(rateLimit.resetAt),
+        },
+      }
+    );
+  }
+
   try {
     const body = await request.json();
     const { email, password, displayName } = body;
@@ -14,9 +46,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (password.length < 6) {
+    // Validate email format
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.valid) {
       return NextResponse.json(
-        { success: false, error: 'Password must be at least 6 characters' },
+        { success: false, error: 'Invalid email address' },
+        { status: 400 }
+      );
+    }
+
+    // Validate password strength
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Password does not meet requirements',
+          details: passwordValidation.errors,
+        },
         { status: 400 }
       );
     }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import axios from 'axios';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase';
 import { Platform, OAuthTokens } from '@/lib/types';
+import { verifySignedState, encryptToken } from '@/lib/security';
 
 async function exchangeCodeForTokens(
   platform: Platform,
@@ -84,15 +85,17 @@ export async function GET(request: NextRequest) {
   let platform: Platform;
   let returnUrl: string;
 
-  try {
-    const stateData = JSON.parse(Buffer.from(state, 'base64').toString());
-    platform = stateData.platform;
-    returnUrl = stateData.returnUrl || '/connectors';
-  } catch {
+  // Verify the cryptographically signed state parameter
+  const stateData = verifySignedState(state);
+  if (!stateData) {
+    console.error('Invalid or expired OAuth state parameter');
     return NextResponse.redirect(
       new URL('/connectors?error=invalid_state', request.url)
     );
   }
+
+  platform = stateData.platform as Platform;
+  returnUrl = (stateData.returnUrl as string) || '/connectors';
 
   try {
     // Get user from session cookie
@@ -114,13 +117,20 @@ export async function GET(request: NextRequest) {
     // Calculate expiry time
     const expiresAt = new Date(Date.now() + tokens.expiresIn * 1000);
 
-    // Update user's connected accounts in Firestore
+    // Encrypt tokens before storing in database
+    const encryptedAccessToken = encryptToken(tokens.accessToken);
+    const encryptedRefreshToken = tokens.refreshToken
+      ? encryptToken(tokens.refreshToken)
+      : null;
+
+    // Update user's connected accounts in Firestore with encrypted tokens
     const adminDb = getAdminDb();
     await adminDb.collection('users').doc(userId).update({
       [`connectedAccounts.${platform}`]: {
         connected: true,
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken || null,
+        accessToken: encryptedAccessToken,
+        refreshToken: encryptedRefreshToken,
+        tokenEncrypted: true, // Flag to indicate tokens are encrypted
         expiresAt,
         connectedAt: new Date(),
       },

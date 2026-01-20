@@ -1,6 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { WhatsAppClient } from '@/lib/apis/whatsapp';
 import { getAdminDb } from '@/lib/firebase';
+
+/**
+ * Verify the X-Hub-Signature-256 header from Meta
+ * This ensures the webhook request is authentic and hasn't been tampered with
+ */
+function verifyWebhookSignature(payload: string, signature: string | null): boolean {
+  if (!signature) {
+    return false;
+  }
+
+  const appSecret = process.env.META_APP_SECRET;
+  if (!appSecret) {
+    console.error('META_APP_SECRET is not configured');
+    return false;
+  }
+
+  const expectedSignature =
+    'sha256=' +
+    crypto.createHmac('sha256', appSecret).update(payload).digest('hex');
+
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(signature),
+      Buffer.from(expectedSignature)
+    );
+  } catch {
+    return false;
+  }
+}
 
 // GET - Webhook verification
 export async function GET(request: NextRequest) {
@@ -38,10 +68,25 @@ export async function GET(request: NextRequest) {
 // POST - Incoming messages and status updates
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    // Get the raw body for signature verification
+    const rawBody = await request.text();
 
-    // Log incoming webhook for debugging
-    console.log('WhatsApp Webhook received:', JSON.stringify(body, null, 2));
+    // Verify the webhook signature from Meta
+    const signature = request.headers.get('X-Hub-Signature-256');
+    if (!verifyWebhookSignature(rawBody, signature)) {
+      console.error('Invalid webhook signature - rejecting request');
+      return NextResponse.json(
+        { error: 'Invalid signature' },
+        { status: 401 }
+      );
+    }
+
+    const body = JSON.parse(rawBody);
+
+    // Log incoming webhook for debugging (sanitized - don't log sensitive data in production)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('WhatsApp Webhook received:', JSON.stringify(body, null, 2));
+    }
 
     // Parse the message
     const message = WhatsAppClient.parseWebhookMessage(body);

@@ -1,8 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase';
 import { createUser, getUser } from '@/lib/auth';
+import { checkRateLimit, RateLimits, getClientIP } from '@/lib/security';
 
 export async function POST(request: NextRequest) {
+  // Apply rate limiting to prevent brute force attacks
+  const clientIP = getClientIP(request.headers);
+  const rateLimit = checkRateLimit(
+    `login:${clientIP}`,
+    RateLimits.AUTH.limit,
+    RateLimits.AUTH.windowMs
+  );
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Too many login attempts. Please try again later.',
+      },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(rateLimit.retryAfter || 60),
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': String(rateLimit.resetAt),
+        },
+      }
+    );
+  }
+
   try {
     const body = await request.json();
     const { idToken } = body;
