@@ -8,13 +8,15 @@ export interface GA4Metric {
   description: string;
 }
 
+// GA4 Data API v1beta metric names
+// See: https://developers.google.com/analytics/devguides/reporting/data/v1/api-schema
 export const AVAILABLE_GA4_METRICS: GA4Metric[] = [
   { name: 'sessions', displayName: 'Sessions', description: 'Total number of sessions' },
-  { name: 'users', displayName: 'Users', description: 'Total number of users' },
+  { name: 'totalUsers', displayName: 'Users', description: 'Total number of users' },
   { name: 'newUsers', displayName: 'New Users', description: 'Number of new users' },
-  { name: 'pageviews', displayName: 'Page Views', description: 'Total page views' },
+  { name: 'screenPageViews', displayName: 'Page Views', description: 'Total page views' },
   { name: 'bounceRate', displayName: 'Bounce Rate', description: 'Percentage of single-page sessions' },
-  { name: 'avgSessionDuration', displayName: 'Avg Session Duration', description: 'Average session duration in seconds' },
+  { name: 'averageSessionDuration', displayName: 'Avg Session Duration', description: 'Average session duration in seconds' },
   { name: 'conversions', displayName: 'Conversions', description: 'Total number of conversions' },
   { name: 'totalRevenue', displayName: 'Revenue', description: 'Total revenue' },
 ];
@@ -69,7 +71,7 @@ export class GA4Client {
     propertyId: string,
     startDate: string,
     endDate: string,
-    metrics: string[] = ['sessions', 'users', 'pageviews'],
+    metrics: string[] = ['sessions', 'totalUsers', 'screenPageViews'],
     dimensions: string[] = ['date']
   ): Promise<MetricRow[]> {
     try {
@@ -148,17 +150,17 @@ export class GA4Client {
         }
       });
 
-      // Parse metrics
+      // Parse metrics - using GA4 Data API v1beta metric names
       row.metricValues?.forEach((metricValue, idx) => {
         const metricName = metrics[idx];
         const value = parseFloat(metricValue.value || '0');
 
         switch (metricName) {
           case 'sessions':
-          case 'pageviews':
+          case 'screenPageViews':
             entry.impressions = (entry.impressions || 0) + value;
             break;
-          case 'users':
+          case 'totalUsers':
             entry.clicks = value; // Map users to clicks for consistency
             break;
           case 'conversions':
