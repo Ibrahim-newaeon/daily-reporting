@@ -1,0 +1,76 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getAdminAuth } from '@/lib/firebase';
+import { createUser } from '@/lib/auth';
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { email, password, displayName } = body;
+
+    if (!email || !password) {
+      return NextResponse.json(
+        { success: false, error: 'Email and password are required' },
+        { status: 400 }
+      );
+    }
+
+    if (password.length < 6) {
+      return NextResponse.json(
+        { success: false, error: 'Password must be at least 6 characters' },
+        { status: 400 }
+      );
+    }
+
+    const adminAuth = getAdminAuth();
+
+    // Create user in Firebase Auth
+    const userRecord = await adminAuth.createUser({
+      email,
+      password,
+      displayName: displayName || email.split('@')[0],
+    });
+
+    // Create user document in Firestore
+    const user = await createUser(
+      userRecord.uid,
+      email,
+      displayName || email.split('@')[0]
+    );
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          displayName: user.displayName,
+        },
+      },
+      message: 'Account created successfully. Please sign in.',
+    });
+  } catch (error: unknown) {
+    console.error('Signup error:', error);
+
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    // Handle Firebase specific errors
+    if (errorMessage.includes('email-already-exists')) {
+      return NextResponse.json(
+        { success: false, error: 'An account with this email already exists' },
+        { status: 400 }
+      );
+    }
+
+    if (errorMessage.includes('invalid-email')) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid email address' },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      { success: false, error: 'Failed to create account' },
+      { status: 500 }
+    );
+  }
+}
