@@ -6,6 +6,10 @@ import { createWhatsAppClient } from '@/lib/apis/whatsapp';
 import { ReportProfile, GeneratedReport, PlatformMetrics } from '@/lib/types';
 import { generateId, formatCurrency, formatDate, platformDisplayNames } from '@/lib/utils';
 
+// Configure route segment for long-running report generation
+export const maxDuration = 60; // 60 second timeout
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   const authResult = await authenticateRequest(request);
 

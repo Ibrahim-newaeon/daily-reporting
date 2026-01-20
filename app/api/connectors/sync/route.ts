@@ -9,6 +9,10 @@ import { createMetaAdsClient } from '@/lib/apis/meta-ads';
 import { createLinkedInAdsClient } from '@/lib/apis/linkedin-ads';
 import { getDateRange } from '@/lib/utils';
 
+// Configure route segment for long-running sync operations
+export const maxDuration = 120; // 120 second timeout for syncing multiple platforms
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   const authResult = await authenticateRequest(request);
 
