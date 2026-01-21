@@ -112,7 +112,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-5. Open [http://localhost:3000](http://localhost:3000)
+5. Open [http://localhost:3030](http://localhost:3030)
 
 ### Docker Deployment
 
@@ -129,7 +129,7 @@ cp .env.example .env
 docker-compose up --build
 ```
 
-3. Access the app at `http://localhost:3000`
+3. Access the app at `http://localhost:3030`
 
 #### Using Docker Directly
 

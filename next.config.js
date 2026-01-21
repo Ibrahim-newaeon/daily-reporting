@@ -13,7 +13,7 @@ const nextConfig = {
     // Define allowed origins - in production, only allow your domain
     const allowedOrigins = [
       process.env.NEXT_PUBLIC_APP_URL,
-      'http://localhost:3000',
+      'http://localhost:3030',
     ].filter(Boolean);
 
     return [
