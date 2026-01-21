@@ -4,7 +4,27 @@ const nextConfig = {
   // Enable standalone output for Docker deployment
   output: 'standalone',
   experimental: {
-    serverComponentsExternalPackages: ['puppeteer-core', '@google-cloud/bigquery'],
+    serverComponentsExternalPackages: [
+      'puppeteer-core',
+      '@google-cloud/bigquery',
+      '@google-cloud/storage',
+      'firebase-admin',
+    ],
+  },
+  // Exclude server-only packages from client bundle
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        net: false,
+        tls: false,
+        fs: false,
+        dns: false,
+        child_process: false,
+        'fs/promises': false,
+      };
+    }
+    return config;
   },
   images: {
     domains: ['storage.googleapis.com', 'lh3.googleusercontent.com'],
