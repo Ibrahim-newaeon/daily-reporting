@@ -17,6 +17,8 @@ const storage = new Storage();
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const META_TOKEN_URL = 'https://graph.facebook.com/v18.0/oauth/access_token';
 const LINKEDIN_TOKEN_URL = 'https://www.linkedin.com/oauth/v2/accessToken';
+const TIKTOK_TOKEN_URL = 'https://business-api.tiktok.com/open_api/v1.3/oauth2/refresh_token/';
+const SNAP_TOKEN_URL = 'https://accounts.snapchat.com/login/oauth2/access_token';
 
 // Retry configuration
 const MAX_RETRIES = 3;
@@ -343,6 +345,51 @@ async function refreshLinkedInToken(refreshToken: string): Promise<string | null
 }
 
 /**
+ * Refresh TikTok OAuth token
+ */
+async function refreshTikTokToken(refreshToken: string): Promise<string | null> {
+  try {
+    const response = await axios.post(TIKTOK_TOKEN_URL, {
+      app_id: process.env.TIKTOK_APP_ID || '',
+      secret: process.env.TIKTOK_APP_SECRET || '',
+      refresh_token: refreshToken,
+    }, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (response.data.code !== 0) {
+      console.error('TikTok token refresh failed:', response.data.message);
+      return null;
+    }
+
+    return response.data.data.access_token;
+  } catch (error) {
+    console.error('Failed to refresh TikTok token:', error);
+    return null;
+  }
+}
+
+/**
+ * Refresh Snapchat OAuth token
+ */
+async function refreshSnapToken(refreshToken: string): Promise<string | null> {
+  try {
+    const response = await axios.post(SNAP_TOKEN_URL, new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+      client_id: process.env.SNAP_CLIENT_ID || '',
+      client_secret: process.env.SNAP_CLIENT_SECRET || '',
+    }), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    return response.data.access_token;
+  } catch (error) {
+    console.error('Failed to refresh Snap token:', error);
+    return null;
+  }
+}
+
+/**
  * Fetch GA4 metrics using the Data API v1beta
  */
 async function fetchGA4Metrics(
@@ -533,6 +580,99 @@ async function fetchLinkedInAdsMetrics(
 }
 
 /**
+ * Fetch TikTok Ads metrics
+ */
+async function fetchTikTokAdsMetrics(
+  accessToken: string,
+  advertiserId: string,
+  startDate: string,
+  endDate: string
+): Promise<MetricData> {
+  const response = await axios.get(
+    'https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/',
+    {
+      headers: {
+        'Access-Token': accessToken,
+        'Content-Type': 'application/json',
+      },
+      params: {
+        advertiser_id: advertiserId,
+        report_type: 'BASIC',
+        data_level: 'AUCTION_ADVERTISER',
+        dimensions: JSON.stringify(['advertiser_id']),
+        metrics: JSON.stringify([
+          'spend',
+          'impressions',
+          'clicks',
+          'conversion',
+          'complete_payment',
+          'complete_payment_value',
+        ]),
+        start_date: startDate,
+        end_date: endDate,
+      },
+    }
+  );
+
+  if (response.data.code !== 0) {
+    throw new Error(response.data.message || 'TikTok API error');
+  }
+
+  const data = response.data.data?.list?.[0]?.metrics || {};
+
+  return {
+    platform: 'tiktok',
+    spend: parseFloat(data.spend || '0'),
+    impressions: parseInt(data.impressions || '0', 10),
+    clicks: parseInt(data.clicks || '0', 10),
+    conversions: parseInt(data.conversion || '0', 10) + parseInt(data.complete_payment || '0', 10),
+    conversionValue: parseFloat(data.complete_payment_value || '0'),
+  };
+}
+
+/**
+ * Fetch Snapchat Ads metrics
+ */
+async function fetchSnapAdsMetrics(
+  accessToken: string,
+  adAccountId: string,
+  startDate: string,
+  endDate: string
+): Promise<MetricData> {
+  const response = await axios.get(
+    `https://adsapi.snapchat.com/v1/adaccounts/${adAccountId}/stats`,
+    {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      params: {
+        granularity: 'TOTAL',
+        start_time: `${startDate}T00:00:00.000Z`,
+        end_time: `${endDate}T23:59:59.999Z`,
+        fields: 'impressions,swipes,spend,conversion_purchases,conversion_purchases_value,conversion_add_cart,conversion_sign_ups',
+      },
+    }
+  );
+
+  const stats = response.data.total_stats?.[0]?.stats || {};
+
+  // Snap uses "swipes" as clicks and returns spend in micro-currency
+  const conversions = parseInt(stats.conversion_purchases || '0', 10) +
+                     parseInt(stats.conversion_add_cart || '0', 10) +
+                     parseInt(stats.conversion_sign_ups || '0', 10);
+
+  return {
+    platform: 'snapchat',
+    spend: parseFloat(stats.spend || '0') / 1000000, // Convert micro-currency
+    impressions: parseInt(stats.impressions || '0', 10),
+    clicks: parseInt(stats.swipes || '0', 10),
+    conversions,
+    conversionValue: parseFloat(stats.conversion_purchases_value || '0') / 1000000,
+  };
+}
+
+/**
  * Update user's token in Firestore after refresh
  */
 async function updateUserToken(
@@ -602,6 +742,14 @@ async function fetchMetricsFromPlatforms(
             if (!account.accountId) throw new Error('LinkedIn ad account ID not configured');
             return fetchLinkedInAdsMetrics(accessToken, account.accountId, startDateStr, endDateStr);
 
+          case 'tiktok':
+            if (!account.accountId) throw new Error('TikTok advertiser ID not configured');
+            return fetchTikTokAdsMetrics(accessToken, account.accountId, startDateStr, endDateStr);
+
+          case 'snapchat':
+            if (!account.accountId) throw new Error('Snapchat ad account ID not configured');
+            return fetchSnapAdsMetrics(accessToken, account.accountId, startDateStr, endDateStr);
+
           default:
             throw new Error(`Unknown platform: ${platform}`);
         }
@@ -631,6 +779,16 @@ async function fetchMetricsFromPlatforms(
             case 'linkedin':
               if (account.refreshToken) {
                 newToken = await refreshLinkedInToken(account.refreshToken);
+              }
+              break;
+            case 'tiktok':
+              if (account.refreshToken) {
+                newToken = await refreshTikTokToken(account.refreshToken);
+              }
+              break;
+            case 'snapchat':
+              if (account.refreshToken) {
+                newToken = await refreshSnapToken(account.refreshToken);
               }
               break;
           }
@@ -812,6 +970,8 @@ function getPlatformDisplayName(platform: string): string {
     google_ads: 'Google Ads',
     meta: 'Meta Ads',
     linkedin: 'LinkedIn Ads',
+    tiktok: 'TikTok Ads',
+    snapchat: 'Snapchat Ads',
   };
   return names[platform] || platform;
 }

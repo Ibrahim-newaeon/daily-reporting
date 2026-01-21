@@ -7,6 +7,8 @@ import { createGA4Client } from '@/lib/apis/ga4';
 import { createGoogleAdsClient } from '@/lib/apis/google-ads';
 import { createMetaAdsClient } from '@/lib/apis/meta-ads';
 import { createLinkedInAdsClient } from '@/lib/apis/linkedin-ads';
+import { createTikTokAdsClient } from '@/lib/apis/tiktok-ads';
+import { createSnapAdsClient } from '@/lib/apis/snap-ads';
 import { getDateRange } from '@/lib/utils';
 
 // Configure route segment for long-running sync operations
@@ -91,6 +93,22 @@ export async function POST(request: NextRequest) {
 
           case 'linkedin': {
             const client = createLinkedInAdsClient(account.accessToken, account.accountId || '');
+            metrics = await client.getCampaignMetrics(startDate, endDate);
+            break;
+          }
+
+          case 'tiktok': {
+            const client = createTikTokAdsClient(account.accessToken, account.accountId || '');
+            metrics = await client.getCampaignMetrics(startDate, endDate);
+            break;
+          }
+
+          case 'snapchat': {
+            const client = createSnapAdsClient(
+              account.accessToken,
+              account.accountId || '',
+              account.propertyId || '' // Using propertyId for organizationId
+            );
             metrics = await client.getCampaignMetrics(startDate, endDate);
             break;
           }

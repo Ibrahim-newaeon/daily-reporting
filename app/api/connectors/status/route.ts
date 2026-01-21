@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     const connectedAccounts: ConnectedAccounts = userData?.connectedAccounts || {};
 
     // Build status for each platform
-    const platforms: Platform[] = ['ga4', 'google_ads', 'meta', 'linkedin'];
+    const platforms: Platform[] = ['ga4', 'google_ads', 'meta', 'linkedin', 'tiktok', 'snapchat'];
     const status = platforms.map(platform => {
       const account = connectedAccounts[platform];
       const isConnected = account?.connected ?? false;

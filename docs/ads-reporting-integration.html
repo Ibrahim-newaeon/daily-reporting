@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Marketing Dashboard - Ads Reporting Integration Documentation</title>
+  <style>
+    :root {
+      --primary: #3b82f6;
+      --primary-dark: #1e40af;
+      --secondary: #64748b;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --bg-glass: rgba(255, 255, 255, 0.1);
+      --bg-dark: #0f172a;
+      --bg-card: #1e293b;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --border-color: rgba(148, 163, 184, 0.2);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, var(--bg-dark) 0%, #1a1a2e 100%);
+      color: var(--text-primary);
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 60px;
+      padding: 40px;
+      background: var(--bg-glass);
+      backdrop-filter: blur(10px);
+      border-radius: 24px;
+      border: 1px solid var(--border-color);
+    }
+
+    header h1 {
+      font-size: 2.8rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--primary), #8b5cf6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 12px;
+    }
+
+    header p {
+      font-size: 1.2rem;
+      color: var(--text-secondary);
+    }
+
+    header .badge {
+      display: inline-block;
+      background: var(--primary);
+      color: white;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      margin-top: 16px;
+    }
+
+    .toc {
+      background: var(--bg-card);
+      padding: 32px;
+      border-radius: 16px;
+      margin-bottom: 40px;
+      border: 1px solid var(--border-color);
+    }
+
+    .toc h2 {
+      font-size: 1.5rem;
+      margin-bottom: 20px;
+      color: var(--primary);
+    }
+
+    .toc ul {
+      list-style: none;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+    }
+
+    .toc a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+
+    .toc a:hover {
+      background: var(--bg-glass);
+      color: var(--primary);
+      transform: translateX(4px);
+    }
+
+    .toc a::before {
+      content: ">";
+      color: var(--primary);
+      font-weight: bold;
+    }
+
+    section {
+      margin-bottom: 50px;
+    }
+
+    h2 {
+      font-size: 2rem;
+      color: var(--text-primary);
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    h2::before {
+      content: "";
+      width: 6px;
+      height: 32px;
+      background: linear-gradient(180deg, var(--primary), #8b5cf6);
+      border-radius: 3px;
+    }
+
+    h3 {
+      font-size: 1.4rem;
+      color: var(--text-primary);
+      margin: 24px 0 16px 0;
+    }
+
+    h4 {
+      font-size: 1.1rem;
+      color: var(--primary);
+      margin: 16px 0 12px 0;
+    }
+
+    p {
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 24px;
+      border: 1px solid var(--border-color);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .platform-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 24px;
+    }
+
+    .platform-card {
+      background: var(--bg-card);
+      border-radius: 16px;
+      padding: 24px;
+      border: 1px solid var(--border-color);
+      transition: all 0.3s;
+    }
+
+    .platform-card:hover {
+      border-color: var(--primary);
+      box-shadow: 0 0 30px rgba(59, 130, 246, 0.2);
+    }
+
+    .platform-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .platform-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+    }
+
+    .platform-icon.ga4 { background: #F9AB00; color: white; }
+    .platform-icon.google-ads { background: #4285F4; color: white; }
+    .platform-icon.meta { background: #1877F2; color: white; }
+    .platform-icon.linkedin { background: #0A66C2; color: white; }
+    .platform-icon.tiktok { background: #000000; color: white; border: 1px solid #333; }
+    .platform-icon.snapchat { background: #FFFC00; color: #000; }
+
+    .platform-name {
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    .metrics-list {
+      list-style: none;
+      margin-top: 12px;
+    }
+
+    .metrics-list li {
+      padding: 6px 0;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .metrics-list li::before {
+      content: "checkmark";
+      color: var(--success);
+      font-size: 1rem;
+    }
+
+    code {
+      background: #334155;
+      color: #f472b6;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-family: 'Fira Code', 'Monaco', monospace;
+      font-size: 0.9em;
+    }
+
+    pre {
+      background: #0d1117;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      overflow-x: auto;
+      margin: 16px 0;
+    }
+
+    pre code {
+      background: none;
+      padding: 0;
+      color: #e6edf3;
+      font-size: 0.85rem;
+      line-height: 1.6;
+    }
+
+    .code-keyword { color: #ff7b72; }
+    .code-string { color: #a5d6ff; }
+    .code-comment { color: #8b949e; }
+    .code-property { color: #d2a8ff; }
+    .code-number { color: #79c0ff; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      background: var(--bg-card);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    th, td {
+      padding: 14px 18px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    th {
+      background: rgba(59, 130, 246, 0.1);
+      color: var(--primary);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.8rem;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .badge-status {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .badge-critical { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+    .badge-high { background: rgba(249, 115, 22, 0.2); color: #f97316; }
+    .badge-medium { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+    .badge-low { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+
+    .api-endpoint {
+      background: var(--bg-card);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 16px 0;
+      border-left: 4px solid var(--primary);
+    }
+
+    .api-endpoint .method {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      margin-right: 12px;
+    }
+
+    .method-get { background: #22c55e; color: white; }
+    .method-post { background: #3b82f6; color: white; }
+    .method-put { background: #f59e0b; color: white; }
+    .method-delete { background: #ef4444; color: white; }
+
+    .api-path {
+      font-family: 'Fira Code', monospace;
+      color: var(--text-primary);
+      font-size: 1rem;
+    }
+
+    .env-var {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      background: var(--bg-card);
+      border-radius: 8px;
+      margin: 8px 0;
+      border: 1px solid var(--border-color);
+    }
+
+    .env-var code {
+      font-size: 0.9rem;
+    }
+
+    .env-var .required {
+      color: var(--danger);
+      font-size: 0.8rem;
+    }
+
+    .env-var .optional {
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+    }
+
+    .flow-diagram {
+      background: var(--bg-card);
+      padding: 32px;
+      border-radius: 16px;
+      text-align: center;
+      border: 1px solid var(--border-color);
+      margin: 24px 0;
+    }
+
+    .flow-step {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 24px;
+      background: var(--bg-glass);
+      border-radius: 12px;
+      margin: 8px;
+      min-width: 140px;
+    }
+
+    .flow-step .step-num {
+      width: 32px;
+      height: 32px;
+      background: var(--primary);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    .flow-arrow {
+      display: inline-block;
+      color: var(--primary);
+      font-size: 1.5rem;
+      margin: 0 8px;
+    }
+
+    .audit-summary {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin: 24px 0;
+    }
+
+    .audit-box {
+      text-align: center;
+      padding: 20px;
+      border-radius: 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+    }
+
+    .audit-box .count {
+      font-size: 2.5rem;
+      font-weight: 700;
+    }
+
+    .audit-box.critical .count { color: #ef4444; }
+    .audit-box.high .count { color: #f97316; }
+    .audit-box.medium .count { color: #f59e0b; }
+    .audit-box.low .count { color: #22c55e; }
+
+    .audit-box .label {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    footer {
+      text-align: center;
+      padding: 40px 20px;
+      border-top: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      margin-top: 60px;
+    }
+
+    footer strong {
+      color: var(--primary);
+    }
+
+    @media (max-width: 768px) {
+      header h1 { font-size: 2rem; }
+      .platform-grid { grid-template-columns: 1fr; }
+      .audit-summary { grid-template-columns: repeat(2, 1fr); }
+      .toc ul { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Marketing Dashboard - Ads Reporting Integration</h1>
+      <p>Comprehensive documentation for multi-platform advertising analytics integration</p>
+      <span class="badge">Version 2.0 - January 2026</span>
+    </header>
+
+    <nav class="toc">
+      <h2>Table of Contents</h2>
+      <ul>
+        <li><a href="#overview">Solution Overview</a></li>
+        <li><a href="#platforms">Supported Platforms</a></li>
+        <li><a href="#architecture">Architecture</a></li>
+        <li><a href="#oauth">OAuth Flow</a></li>
+        <li><a href="#api-clients">API Clients</a></li>
+        <li><a href="#backend-api">Backend API Endpoints</a></li>
+        <li><a href="#database">Database Schema</a></li>
+        <li><a href="#env-vars">Environment Variables</a></li>
+        <li><a href="#security">Security Implementation</a></li>
+        <li><a href="#audit">Audit Findings</a></li>
+        <li><a href="#deployment">Deployment Guide</a></li>
+      </ul>
+    </nav>
+
+    <section id="overview">
+      <h2>Solution Overview</h2>
+      <div class="card">
+        <p>The Marketing Dashboard is a full-stack SaaS application built with <strong>Next.js 14</strong> that aggregates advertising metrics from multiple platforms and delivers automated PDF reports via WhatsApp.</p>
+
+        <h4>Key Features</h4>
+        <ul class="metrics-list">
+          <li>Multi-platform ad metrics aggregation</li>
+          <li>Real-time and historical data visualization</li>
+          <li>Automated scheduled PDF report generation</li>
+          <li>WhatsApp delivery integration</li>
+          <li>Secure OAuth 2.0 authentication for all platforms</li>
+          <li>Token encryption at rest with AES-256-GCM</li>
+          <li>BigQuery-powered historical analytics</li>
+        </ul>
+
+        <h4>Technology Stack</h4>
+        <table>
+          <tr><th>Layer</th><th>Technology</th></tr>
+          <tr><td>Frontend</td><td>Next.js 14, React 18, TailwindCSS, Recharts</td></tr>
+          <tr><td>Backend</td><td>Next.js API Routes, TypeScript</td></tr>
+          <tr><td>Database</td><td>Firebase Firestore + Google BigQuery</td></tr>
+          <tr><td>Authentication</td><td>Firebase Auth + OAuth 2.0</td></tr>
+          <tr><td>Cloud</td><td>GCP (Cloud Functions, Cloud Storage, Cloud Scheduler)</td></tr>
+          <tr><td>PDF Generation</td><td>Puppeteer with headless Chromium</td></tr>
+          <tr><td>Messaging</td><td>WhatsApp Cloud API</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <section id="platforms">
+      <h2>Supported Platforms</h2>
+      <p>The solution supports 6 advertising and analytics platforms with full API integration:</p>
+
+      <div class="platform-grid">
+        <div class="platform-card">
+          <div class="platform-header">
+            <div class="platform-icon ga4">GA</div>
+            <span class="platform-name">Google Analytics 4</span>
+          </div>
+          <p>Website analytics and conversion tracking</p>
+          <ul class="metrics-list">
+            <li>Sessions & Users</li>
+            <li>Page Views & Bounce Rate</li>
+            <li>Conversions & Revenue</li>
+            <li>Real-time Active Users</li>
+          </ul>
+        </div>
+
+        <div class="platform-card">
+          <div class="platform-header">
+            <div class="platform-icon google-ads">Ads</div>
+            <span class="platform-name">Google Ads</span>
+          </div>
+          <p>Search, Display, and Video advertising</p>
+          <ul class="metrics-list">
+            <li>Impressions & Clicks</li>
+            <li>Cost & Conversions</li>
+            <li>CTR, CPC, CPA</li>
+            <li>ROAS & Conversion Value</li>
+          </ul>
+        </div>
+
+        <div class="platform-card">
+          <div class="platform-header">
+            <div class="platform-icon meta">f</div>
+            <span class="platform-name">Meta Ads</span>
+          </div>
+          <p>Facebook & Instagram advertising</p>
+          <ul class="metrics-list">
+            <li>Reach & Impressions</li>
+            <li>Clicks & Actions</li>
+            <li>Purchase Conversions</li>
+            <li>Action Values (ROAS)</li>
+          </ul>
+        </div>
+
+        <div class="platform-card">
+          <div class="platform-header">
+            <div class="platform-icon linkedin">in</div>
+            <span class="platform-name">LinkedIn Ads</span>
+          </div>
+          <p>B2B professional advertising</p>
+          <ul class="metrics-list">
+            <li>Impressions & Clicks</li>
+            <li>Cost in USD</li>
+            <li>External Conversions</li>
+            <li>Conversion Value</li>
+          </ul>
+        </div>
+
+        <div class="platform-card">
+          <div class="platform-header">
+            <div class="platform-icon tiktok">T</div>
+            <span class="platform-name">TikTok Ads</span>
+          </div>
+          <p>Short-form video advertising</p>
+          <ul class="metrics-list">
+            <li>Video Views & Impressions</li>
+            <li>Clicks & Conversions</li>
+            <li>Complete Payments</li>
+            <li>Payment Value (ROAS)</li>
+          </ul>
+        </div>
+
+        <div class="platform-card">
+          <div class="platform-header">
+            <div class="platform-icon snapchat">S</div>
+            <span class="platform-name">Snapchat Ads</span>
+          </div>
+          <p>AR and video advertising</p>
+          <ul class="metrics-list">
+            <li>Impressions & Swipes</li>
+            <li>Spend (micro-currency)</li>
+            <li>Purchases & Sign-ups</li>
+            <li>Add to Cart Events</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="architecture">
+      <h2>Architecture</h2>
+      <div class="card">
+        <pre><code>
+<span class="code-comment">// System Architecture Diagram</span>
+
++---------------------------------------------------------+
+|                   Frontend (Next.js 14)                 |
+|  +----------+ +------------+ +----------+ +-----------+ |
+|  |Dashboard | |Connectors  | |Profiles  | |Reports    | |
+|  +----+-----+ +-----+------+ +----+-----+ +-----+-----+ |
+|       +-----------+-+------------+-------------+        |
++-------------------|---------------------------------+---+
+                    |
++-------------------+------------------------------------+
+|              Backend API Routes (Next.js)              |
+|  +---------------------------------------------------+ |
+|  |  /api/auth       /api/connectors    /api/profiles | |
+|  |  /api/reports    /api/data          /api/webhooks | |
+|  +---------------------------------------------------+ |
++-------+------------------+------------------+----------+
+        |                  |                  |
++-------+------+  +--------+-------+  +-------+--------+
+|   Firebase   |  |   BigQuery     |  |Cloud Storage   |
+|   Firestore  |  |   metrics      |  |   PDF Files    |
++--------------+  +----------------+  +----------------+
+        |
++-------+----------------------------------------+
+|         Platform API Clients (lib/apis)        |
+|  +-------+ +--------+ +------+ +--------+     |
+|  | GA4   | |Google  | | Meta | |LinkedIn|     |
+|  +-------+ |Ads     | +------+ +--------+     |
+|  +--------++--------+ +---------+             |
+|  |TikTok  | |Snapchat|                        |
+|  +--------+ +---------+                       |
++------------------------------------------------+
+        </code></pre>
+      </div>
+    </section>
+
+    <section id="oauth">
+      <h2>OAuth Flow</h2>
+      <div class="card">
+        <p>All platform integrations use OAuth 2.0 for secure authorization. The flow includes CSRF protection via cryptographically signed state parameters.</p>
+
+        <div class="flow-diagram">
+          <div class="flow-step">
+            <span class="step-num">1</span>
+            <span>User Clicks Connect</span>
+          </div>
+          <span class="flow-arrow">-></span>
+          <div class="flow-step">
+            <span class="step-num">2</span>
+            <span>Generate Signed State</span>
+          </div>
+          <span class="flow-arrow">-></span>
+          <div class="flow-step">
+            <span class="step-num">3</span>
+            <span>Redirect to Platform</span>
+          </div>
+          <span class="flow-arrow">-></span>
+          <div class="flow-step">
+            <span class="step-num">4</span>
+            <span>User Authorizes</span>
+          </div>
+          <span class="flow-arrow">-></span>
+          <div class="flow-step">
+            <span class="step-num">5</span>
+            <span>Callback + Token Exchange</span>
+          </div>
+          <span class="flow-arrow">-></span>
+          <div class="flow-step">
+            <span class="step-num">6</span>
+            <span>Encrypt & Store Tokens</span>
+          </div>
+        </div>
+
+        <h4>OAuth Scopes by Platform</h4>
+        <table>
+          <tr>
+            <th>Platform</th>
+            <th>Required Scopes</th>
+          </tr>
+          <tr>
+            <td>GA4</td>
+            <td><code>analytics.readonly</code>, <code>analytics</code></td>
+          </tr>
+          <tr>
+            <td>Google Ads</td>
+            <td><code>adwords</code></td>
+          </tr>
+          <tr>
+            <td>Meta</td>
+            <td><code>ads_management</code>, <code>ads_read</code>, <code>business_management</code></td>
+          </tr>
+          <tr>
+            <td>LinkedIn</td>
+            <td><code>r_ads</code>, <code>r_ads_reporting</code>, <code>r_organization_social</code></td>
+          </tr>
+          <tr>
+            <td>TikTok</td>
+            <td><code>ad.read</code>, <code>ad.management</code>, <code>report.read</code></td>
+          </tr>
+          <tr>
+            <td>Snapchat</td>
+            <td><code>snapchat-marketing-api</code>, <code>snapchat-marketing-api-ads-read</code></td>
+          </tr>
+        </table>
+      </div>
+    </section>
+
+    <section id="api-clients">
+      <h2>API Clients</h2>
+      <div class="card">
+        <p>Each platform has a dedicated API client in <code>lib/apis/</code> with standardized interfaces:</p>
+
+        <h4>Client Interface Pattern</h4>
+        <pre><code>
+<span class="code-comment">// Standard API Client Pattern</span>
+<span class="code-keyword">export class</span> <span class="code-property">PlatformAdsClient</span> {
+  <span class="code-keyword">constructor</span>(accessToken: <span class="code-property">string</span>, accountId: <span class="code-property">string</span>);
+
+  <span class="code-comment">// Get available ad accounts</span>
+  <span class="code-keyword">async</span> getAdAccounts(): <span class="code-property">Promise</span>&lt;AdAccount[]&gt;;
+
+  <span class="code-comment">// Get campaigns for selected account</span>
+  <span class="code-keyword">async</span> getCampaigns(): <span class="code-property">Promise</span>&lt;Campaign[]&gt;;
+
+  <span class="code-comment">// Get campaign-level metrics</span>
+  <span class="code-keyword">async</span> getCampaignMetrics(startDate, endDate): <span class="code-property">Promise</span>&lt;MetricRow[]&gt;;
+
+  <span class="code-comment">// Get account-level aggregated metrics</span>
+  <span class="code-keyword">async</span> getAccountMetrics(startDate, endDate): <span class="code-property">Promise</span>&lt;AccountMetrics&gt;;
+
+  <span class="code-comment">// Validate token is still valid</span>
+  <span class="code-keyword">async</span> validateToken(): <span class="code-property">Promise</span>&lt;boolean&gt;;
+
+  <span class="code-comment">// Refresh expired access token</span>
+  <span class="code-keyword">async</span> refreshAccessToken(refreshToken): <span class="code-property">Promise</span>&lt;TokenResponse&gt;;
+}
+        </code></pre>
+
+        <h4>API Client Files</h4>
+        <table>
+          <tr>
+            <th>Platform</th>
+            <th>File</th>
+            <th>Base URL</th>
+          </tr>
+          <tr>
+            <td>GA4</td>
+            <td><code>lib/apis/ga4.ts</code></td>
+            <td>analyticsdata.googleapis.com/v1beta</td>
+          </tr>
+          <tr>
+            <td>Google Ads</td>
+            <td><code>lib/apis/google-ads.ts</code></td>
+            <td>googleads.googleapis.com/v15</td>
+          </tr>
+          <tr>
+            <td>Meta</td>
+            <td><code>lib/apis/meta-ads.ts</code></td>
+            <td>graph.facebook.com/v18.0</td>
+          </tr>
+          <tr>
+            <td>LinkedIn</td>
+            <td><code>lib/apis/linkedin-ads.ts</code></td>
+            <td>api.linkedin.com/rest</td>
+          </tr>
+          <tr>
+            <td>TikTok</td>
+            <td><code>lib/apis/tiktok-ads.ts</code></td>
+            <td>business-api.tiktok.com/open_api/v1.3</td>
+          </tr>
+          <tr>
+            <td>Snapchat</td>
+            <td><code>lib/apis/snap-ads.ts</code></td>
+            <td>adsapi.snapchat.com/v1</td>
+          </tr>
+        </table>
+      </div>
+    </section>
+
+    <section id="backend-api">
+      <h2>Backend API Endpoints</h2>
+      <div class="card">
+        <h4>Authentication</h4>
+        <div class="api-endpoint">
+          <span class="method method-post">POST</span>
+          <span class="api-path">/api/auth/signup</span>
+          <p>Create new user account</p>
+        </div>
+        <div class="api-endpoint">
+          <span class="method method-post">POST</span>
+          <span class="api-path">/api/auth/login</span>
+          <p>Authenticate user and create session</p>
+        </div>
+        <div class="api-endpoint">
+          <span class="method method-post">POST</span>
+          <span class="api-path">/api/auth/logout</span>
+          <p>Invalidate session and clear cookies</p>
+        </div>
+
+        <h4>Connectors</h4>
+        <div class="api-endpoint">
+          <span class="method method-get">GET</span>
+          <span class="api-path">/api/connectors/oauth/authorize?platform={platform}</span>
+          <p>Initiate OAuth flow for platform connection</p>
+        </div>
+        <div class="api-endpoint">
+          <span class="method method-get">GET</span>
+          <span class="api-path">/api/connectors/oauth/callback</span>
+          <p>OAuth callback handler - exchanges code for tokens</p>
+        </div>
+        <div class="api-endpoint">
+          <span class="method method-get">GET</span>
+          <span class="api-path">/api/connectors/status</span>
+          <p>Get connection status for all platforms</p>
+        </div>
+        <div class="api-endpoint">
+          <span class="method method-post">POST</span>
+          <span class="api-path">/api/connectors/sync</span>
+          <p>Sync data from connected platforms</p>
+        </div>
+
+        <h4>Profiles</h4>
+        <div class="api-endpoint">
+          <span class="method method-get">GET</span>
+          <span class="api-path">/api/profiles</span>
+          <p>List all report profiles</p>
+        </div>
+        <div class="api-endpoint">
+          <span class="method method-post">POST</span>
+          <span class="api-path">/api/profiles</span>
+          <p>Create new report profile</p>
+        </div>
+        <div class="api-endpoint">
+          <span class="method method-get">GET</span>
+          <span class="api-path">/api/profiles/{id}</span>
+          <p>Get profile details</p>
+        </div>
+        <div class="api-endpoint">
+          <span class="method method-put">PUT</span>
+          <span class="api-path">/api/profiles/{id}</span>
+          <p>Update profile configuration</p>
+        </div>
+        <div class="api-endpoint">
+          <span class="method method-delete">DELETE</span>
+          <span class="api-path">/api/profiles/{id}</span>
+          <p>Delete report profile</p>
+        </div>
+
+        <h4>Reports</h4>
+        <div class="api-endpoint">
+          <span class="method method-post">POST</span>
+          <span class="api-path">/api/reports/generate</span>
+          <p>Generate report on-demand</p>
+        </div>
+        <div class="api-endpoint">
+          <span class="method method-get">GET</span>
+          <span class="api-path">/api/reports</span>
+          <p>List generated reports</p>
+        </div>
+        <div class="api-endpoint">
+          <span class="method method-get">GET</span>
+          <span class="api-path">/api/reports/{id}</span>
+          <p>Get report with metrics</p>
+        </div>
+
+        <h4>Data</h4>
+        <div class="api-endpoint">
+          <span class="method method-get">GET</span>
+          <span class="api-path">/api/data/metrics?dateRange={range}</span>
+          <p>Get raw metrics with filtering</p>
+        </div>
+        <div class="api-endpoint">
+          <span class="method method-get">GET</span>
+          <span class="api-path">/api/data/summary</span>
+          <p>Get summary metrics with platform breakdown</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="database">
+      <h2>Database Schema</h2>
+      <div class="card">
+        <h4>Firestore Collections</h4>
+        <pre><code>
+<span class="code-comment">// users/{userId}</span>
+{
+  id: <span class="code-string">"string"</span>,
+  email: <span class="code-string">"string"</span>,
+  displayName: <span class="code-string">"string"</span>,
+  connectedAccounts: {
+    ga4: { connected, accessToken, refreshToken, expiresAt, propertyId },
+    google_ads: { connected, accessToken, refreshToken, accountId },
+    meta: { connected, accessToken, accountId },
+    linkedin: { connected, accessToken, refreshToken, accountId },
+    tiktok: { connected, accessToken, refreshToken, accountId },
+    snapchat: { connected, accessToken, refreshToken, accountId, organizationId }
+  },
+  settings: { timezone, currency, notifications }
+}
+
+<span class="code-comment">// users/{userId}/reportProfiles/{profileId}</span>
+{
+  id: <span class="code-string">"string"</span>,
+  name: <span class="code-string">"string"</span>,
+  platforms: [<span class="code-string">"ga4"</span>, <span class="code-string">"meta"</span>, <span class="code-string">"tiktok"</span>],
+  schedule: { enabled, frequency, time, timezone },
+  whatsappRecipients: [{ id, name, number, isActive }]
+}
+
+<span class="code-comment">// generatedReports/{reportId}</span>
+{
+  profileId: <span class="code-string">"string"</span>,
+  userId: <span class="code-string">"string"</span>,
+  generatedAt: <span class="code-property">Date</span>,
+  pdfUrl: <span class="code-string">"string"</span>,
+  status: <span class="code-string">"success"</span> | <span class="code-string">"failed"</span>,
+  metrics: { totalSpend, totalConversions, roas, byPlatform: [...] },
+  deliveries: [{ recipientId, status, sentAt }]
+}
+        </code></pre>
+
+        <h4>BigQuery Table: metrics</h4>
+        <pre><code>
+<span class="code-keyword">CREATE TABLE</span> marketing_data.metrics (
+  date <span class="code-property">STRING</span>,
+  platform <span class="code-property">STRING</span>,          <span class="code-comment">-- ga4, google_ads, meta, linkedin, tiktok, snapchat</span>
+  user_id <span class="code-property">STRING</span>,
+  profile_id <span class="code-property">STRING</span>,
+  campaign_id <span class="code-property">STRING</span>,
+  campaign_name <span class="code-property">STRING</span>,
+  impressions <span class="code-property">INTEGER</span>,
+  clicks <span class="code-property">INTEGER</span>,
+  spend <span class="code-property">NUMERIC</span>,
+  conversions <span class="code-property">NUMERIC</span>,
+  conversion_value <span class="code-property">NUMERIC</span>,
+  created_at <span class="code-property">TIMESTAMP</span>
+);
+        </code></pre>
+      </div>
+    </section>
+
+    <section id="env-vars">
+      <h2>Environment Variables</h2>
+      <div class="card">
+        <h4>GCP Configuration</h4>
+        <div class="env-var">
+          <code>GCP_PROJECT</code>
+          <span class="required">Required</span>
+        </div>
+        <div class="env-var">
+          <code>GCP_SERVICE_ACCOUNT_KEY</code>
+          <span class="required">Required</span>
+        </div>
+        <div class="env-var">
+          <code>BQ_DATASET</code>
+          <span class="optional">Optional (default: marketing_data)</span>
+        </div>
+        <div class="env-var">
+          <code>GCS_BUCKET</code>
+          <span class="required">Required</span>
+        </div>
+
+        <h4>Firebase</h4>
+        <div class="env-var">
+          <code>NEXT_PUBLIC_FIREBASE_API_KEY</code>
+          <span class="required">Required</span>
+        </div>
+        <div class="env-var">
+          <code>NEXT_PUBLIC_FIREBASE_PROJECT_ID</code>
+          <span class="required">Required</span>
+        </div>
+        <div class="env-var">
+          <code>FIREBASE_ADMIN_SDK_KEY</code>
+          <span class="required">Required</span>
+        </div>
+
+        <h4>OAuth Credentials</h4>
+        <div class="env-var">
+          <code>NEXT_PUBLIC_GOOGLE_CLIENT_ID</code>
+          <span class="required">Required</span>
+        </div>
+        <div class="env-var">
+          <code>GOOGLE_CLIENT_SECRET</code>
+          <span class="required">Required</span>
+        </div>
+        <div class="env-var">
+          <code>NEXT_PUBLIC_META_APP_ID</code>
+          <span class="required">Required</span>
+        </div>
+        <div class="env-var">
+          <code>META_APP_SECRET</code>
+          <span class="required">Required</span>
+        </div>
+        <div class="env-var">
+          <code>LINKEDIN_CLIENT_ID</code>
+          <span class="required">Required</span>
+        </div>
+        <div class="env-var">
+          <code>LINKEDIN_CLIENT_SECRET</code>
+          <span class="required">Required</span>
+        </div>
+        <div class="env-var">
+          <code>TIKTOK_APP_ID</code>
+          <span class="required">Required</span>
+        </div>
+        <div class="env-var">
+          <code>TIKTOK_APP_SECRET</code>
+          <span class="required">Required</span>
+        </div>
+        <div class="env-var">
+          <code>SNAP_CLIENT_ID</code>
+          <span class="required">Required</span>
+        </div>
+        <div class="env-var">
+          <code>SNAP_CLIENT_SECRET</code>
+          <span class="required">Required</span>
+        </div>
+
+        <h4>WhatsApp</h4>
+        <div class="env-var">
+          <code>WHATSAPP_PHONE_ID</code>
+          <span class="required">Required</span>
+        </div>
+        <div class="env-var">
+          <code>WHATSAPP_ACCESS_TOKEN</code>
+          <span class="required">Required</span>
+        </div>
+
+        <h4>Security</h4>
+        <div class="env-var">
+          <code>TOKEN_ENCRYPTION_KEY</code>
+          <span class="required">Required (64 hex chars)</span>
+        </div>
+        <div class="env-var">
+          <code>NEXTAUTH_SECRET</code>
+          <span class="required">Required (min 32 chars)</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="security">
+      <h2>Security Implementation</h2>
+      <div class="card">
+        <h4>Token Security</h4>
+        <ul class="metrics-list">
+          <li>OAuth tokens encrypted at rest using AES-256-GCM</li>
+          <li>Encryption key stored in environment variables</li>
+          <li>Tokens never exposed in client-side code</li>
+          <li>Automatic token refresh with exponential backoff</li>
+        </ul>
+
+        <h4>OAuth Security</h4>
+        <ul class="metrics-list">
+          <li>CSRF protection via cryptographically signed state parameter</li>
+          <li>State expires after 10 minutes</li>
+          <li>HMAC-SHA256 signature verification on callback</li>
+        </ul>
+
+        <h4>API Security</h4>
+        <ul class="metrics-list">
+          <li>Firebase Auth session verification on all protected routes</li>
+          <li>Rate limiting per user/endpoint</li>
+          <li>Input validation using Zod schemas</li>
+          <li>Security headers (X-Frame-Options, CSP, HSTS)</li>
+        </ul>
+
+        <h4>Firestore Security Rules</h4>
+        <ul class="metrics-list">
+          <li>User documents: owner-only read/write</li>
+          <li>Report profiles: owner-only CRUD</li>
+          <li>Generated reports: owner read-only</li>
+          <li>Audit logs: no client-side access</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="audit">
+      <h2>Audit Findings Summary</h2>
+      <div class="card">
+        <p>Comprehensive security and code quality audit completed January 2026.</p>
+
+        <div class="audit-summary">
+          <div class="audit-box critical">
+            <div class="count">9</div>
+            <div class="label">Critical</div>
+          </div>
+          <div class="audit-box high">
+            <div class="count">11</div>
+            <div class="label">High</div>
+          </div>
+          <div class="audit-box medium">
+            <div class="count">18</div>
+            <div class="label">Medium</div>
+          </div>
+          <div class="audit-box low">
+            <div class="count">14</div>
+            <div class="label">Low</div>
+          </div>
+        </div>
+
+        <h4>Critical Issues Identified</h4>
+        <table>
+          <tr>
+            <th>Issue</th>
+            <th>Location</th>
+            <th>Status</th>
+          </tr>
+          <tr>
+            <td>SQL Injection risk in Google Ads query</td>
+            <td>lib/apis/google-ads.ts:134</td>
+            <td><span class="badge-status badge-critical">Requires Fix</span></td>
+          </tr>
+          <tr>
+            <td>Missing authorization on report retrieval</td>
+            <td>app/api/reports/route.ts:17</td>
+            <td><span class="badge-status badge-critical">Requires Fix</span></td>
+          </tr>
+          <tr>
+            <td>Rate limiting uses in-memory store</td>
+            <td>lib/security.ts:12</td>
+            <td><span class="badge-status badge-high">High Priority</span></td>
+          </tr>
+          <tr>
+            <td>Plaintext token storage after refresh</td>
+            <td>functions/generateDailyReports.ts:798</td>
+            <td><span class="badge-status badge-critical">Requires Fix</span></td>
+          </tr>
+          <tr>
+            <td>Weak Bearer token validation in Cloud Functions</td>
+            <td>functions/generateDailyReports.ts:117</td>
+            <td><span class="badge-status badge-high">High Priority</span></td>
+          </tr>
+          <tr>
+            <td>Missing CSRF tokens on forms</td>
+            <td>app/(auth)/login/page.tsx</td>
+            <td><span class="badge-status badge-high">High Priority</span></td>
+          </tr>
+          <tr>
+            <td>Open redirect vulnerability</td>
+            <td>app/(auth)/login/page.tsx:41</td>
+            <td><span class="badge-status badge-high">High Priority</span></td>
+          </tr>
+          <tr>
+            <td>Missing error boundaries on routes</td>
+            <td>app/(dashboard)/*</td>
+            <td><span class="badge-status badge-medium">Medium</span></td>
+          </tr>
+          <tr>
+            <td>Unvalidated URL parameters</td>
+            <td>app/(dashboard)/connectors/page.tsx:43</td>
+            <td><span class="badge-status badge-medium">Medium</span></td>
+          </tr>
+        </table>
+
+        <h4>Recommended Priorities</h4>
+        <ol style="color: var(--text-secondary); margin-left: 20px;">
+          <li><strong>Immediate:</strong> Fix authorization checks, SQL injection, token encryption</li>
+          <li><strong>This Week:</strong> Implement distributed rate limiting, add CSRF tokens</li>
+          <li><strong>Next Sprint:</strong> Add error boundaries, improve accessibility</li>
+          <li><strong>Backlog:</strong> Performance optimizations, bundle splitting</li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="deployment">
+      <h2>Deployment Guide</h2>
+      <div class="card">
+        <h4>Prerequisites</h4>
+        <ul class="metrics-list">
+          <li>Node.js 18+ installed</li>
+          <li>GCP project with enabled APIs</li>
+          <li>Firebase project with Firestore</li>
+          <li>OAuth credentials for all platforms</li>
+        </ul>
+
+        <h4>Deployment Steps</h4>
+        <pre><code>
+<span class="code-comment"># 1. Install dependencies</span>
+npm install
+
+<span class="code-comment"># 2. Set environment variables</span>
+cp .env.example .env.local
+<span class="code-comment"># Edit .env.local with your credentials</span>
+
+<span class="code-comment"># 3. Deploy Firestore rules</span>
+firebase deploy --only firestore:rules
+
+<span class="code-comment"># 4. Deploy Cloud Functions</span>
+cd functions && npm install && npm run deploy
+
+<span class="code-comment"># 5. Build and deploy Next.js app</span>
+npm run build
+npm run start
+
+<span class="code-comment"># Or deploy to Vercel</span>
+vercel --prod
+        </code></pre>
+
+        <h4>Post-Deployment Checklist</h4>
+        <ul class="metrics-list">
+          <li>Verify OAuth redirect URIs in all platform developer consoles</li>
+          <li>Test token encryption/decryption</li>
+          <li>Verify Cloud Scheduler triggers</li>
+          <li>Test WhatsApp webhook verification</li>
+          <li>Run security scan on production URL</li>
+        </ul>
+      </div>
+    </section>
+
+    <footer>
+      <p>Marketing Dashboard SaaS - Ads Reporting Integration Documentation</p>
+      <p><strong>Version 2.0</strong> | Generated: January 21, 2026</p>
+      <p>Includes TikTok Ads & Snapchat Ads integrations</p>
+    </footer>
+  </div>
+</body>
+</html>

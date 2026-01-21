@@ -11,6 +11,7 @@ async function exchangeCodeForTokens(
 ): Promise<OAuthTokens> {
   let tokenUrl: string;
   let params: Record<string, string>;
+  let headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' };
 
   switch (platform) {
     case 'ga4':
@@ -46,12 +47,47 @@ async function exchangeCodeForTokens(
       };
       break;
 
+    case 'tiktok': {
+      // TikTok uses a different token exchange endpoint
+      tokenUrl = 'https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/';
+      const tiktokResponse = await axios.post(tokenUrl, {
+        app_id: process.env.TIKTOK_APP_ID || '',
+        secret: process.env.TIKTOK_APP_SECRET || '',
+        auth_code: code,
+      }, {
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (tiktokResponse.data.code !== 0) {
+        throw new Error(tiktokResponse.data.message || 'TikTok token exchange failed');
+      }
+
+      return {
+        accessToken: tiktokResponse.data.data.access_token,
+        refreshToken: tiktokResponse.data.data.refresh_token,
+        expiresIn: tiktokResponse.data.data.expires_in || 86400,
+        tokenType: 'Bearer',
+        scope: tiktokResponse.data.data.scope,
+      };
+    }
+
+    case 'snapchat':
+      tokenUrl = 'https://accounts.snapchat.com/login/oauth2/access_token';
+      params = {
+        code,
+        client_id: process.env.SNAP_CLIENT_ID || '',
+        client_secret: process.env.SNAP_CLIENT_SECRET || '',
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code',
+      };
+      break;
+
     default:
       throw new Error('Unsupported platform');
   }
 
   const response = await axios.post(tokenUrl, new URLSearchParams(params), {
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers,
   });
 
   return {

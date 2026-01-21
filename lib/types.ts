@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
 // Platform types
-export type Platform = 'ga4' | 'google_ads' | 'meta' | 'linkedin';
+export type Platform = 'ga4' | 'google_ads' | 'meta' | 'linkedin' | 'tiktok' | 'snapchat';
 
-export const PlatformSchema = z.enum(['ga4', 'google_ads', 'meta', 'linkedin']);
+export const PlatformSchema = z.enum(['ga4', 'google_ads', 'meta', 'linkedin', 'tiktok', 'snapchat']);
 
 // User types
 export interface User {
@@ -22,6 +22,8 @@ export interface ConnectedAccounts {
   google_ads?: PlatformConnection;
   meta?: PlatformConnection;
   linkedin?: PlatformConnection;
+  tiktok?: PlatformConnection;
+  snapchat?: PlatformConnection;
 }
 
 export interface PlatformConnection {

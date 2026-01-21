@@ -43,6 +43,23 @@ const OAUTH_CONFIGS: Record<Platform, {
       'r_organization_social',
     ],
   },
+  tiktok: {
+    authUrl: 'https://business-api.tiktok.com/portal/auth',
+    scopes: [
+      'ad.read',
+      'ad.management',
+      'report.read',
+      'user.info.basic',
+    ],
+  },
+  snapchat: {
+    authUrl: 'https://accounts.snapchat.com/login/oauth2/authorize',
+    scopes: [
+      'snapchat-marketing-api',
+      'snapchat-marketing-api-ads-read',
+      'snapchat-marketing-api-organizations-read',
+    ],
+  },
 };
 
 export async function GET(request: NextRequest) {
@@ -94,6 +111,20 @@ export async function GET(request: NextRequest) {
     authUrl.searchParams.set('scope', config.scopes.join(' '));
     authUrl.searchParams.set('state', state);
     authUrl.searchParams.set('response_type', 'code');
+  } else if (platform === 'tiktok') {
+    authUrl = new URL(config.authUrl);
+    authUrl.searchParams.set('app_id', process.env.TIKTOK_APP_ID || '');
+    authUrl.searchParams.set('redirect_uri', redirectUri);
+    authUrl.searchParams.set('state', state);
+    // TikTok uses comma-separated scopes
+    authUrl.searchParams.set('scope', config.scopes.join(','));
+  } else if (platform === 'snapchat') {
+    authUrl = new URL(config.authUrl);
+    authUrl.searchParams.set('client_id', process.env.SNAP_CLIENT_ID || '');
+    authUrl.searchParams.set('redirect_uri', redirectUri);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('scope', config.scopes.join(' '));
+    authUrl.searchParams.set('state', state);
   } else {
     return NextResponse.json(
       { success: false, error: 'Unsupported platform' },
