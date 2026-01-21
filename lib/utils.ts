@@ -203,6 +203,8 @@ export const platformDisplayNames: Record<string, string> = {
   google_ads: 'Google Ads',
   meta: 'Meta Ads',
   linkedin: 'LinkedIn Ads',
+  tiktok: 'TikTok Ads',
+  snapchat: 'Snapchat Ads',
 };
 
 // Platform colors for charts
@@ -211,4 +213,6 @@ export const platformColors: Record<string, string> = {
   google_ads: '#4285F4',
   meta: '#1877F2',
   linkedin: '#0A66C2',
+  tiktok: '#000000',
+  snapchat: '#FFFC00',
 };

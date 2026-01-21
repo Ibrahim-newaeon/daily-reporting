@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase';
 import { createUser, getUser } from '@/lib/auth';
-import { checkRateLimit, RateLimits, getClientIP } from '@/lib/security';
+import { checkRateLimit, RateLimits, getClientIP, createAuditLogEntry } from '@/lib/security';
 
 export async function POST(request: NextRequest) {
   // Apply rate limiting to prevent brute force attacks
@@ -82,9 +82,29 @@ export async function POST(request: NextRequest) {
       path: '/',
     });
 
+    // Log successful login for audit trail
+    const adminDb = getAdminDb();
+    const auditEntry = createAuditLogEntry(user.id, 'LOGIN', 'auth', {
+      ip: clientIP,
+      userAgent: request.headers.get('user-agent') || undefined,
+      success: true,
+    });
+    await adminDb.collection('auditLogs').add(auditEntry);
+
     return response;
   } catch (error) {
     console.error('Login error:', error);
+
+    // Log failed login attempt
+    const adminDb = getAdminDb();
+    const auditEntry = createAuditLogEntry('unknown', 'LOGIN_FAILED', 'auth', {
+      ip: clientIP,
+      userAgent: request.headers.get('user-agent') || undefined,
+      success: false,
+      details: { error: 'Authentication failed' },
+    });
+    await adminDb.collection('auditLogs').add(auditEntry).catch(() => {});
+
     return NextResponse.json(
       { success: false, error: 'Authentication failed' },
       { status: 401 }

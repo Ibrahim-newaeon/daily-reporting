@@ -1,6 +1,24 @@
 import axios, { AxiosError } from 'axios';
 import { MetricRow, Platform } from '../types';
 
+/**
+ * Validate date format to prevent injection attacks in GAQL queries
+ * @param date Date string to validate (expected format: YYYY-MM-DD)
+ * @returns true if valid, throws error if invalid
+ */
+function validateDateFormat(date: string): boolean {
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(date)) {
+    throw new Error(`Invalid date format: ${date}. Expected YYYY-MM-DD`);
+  }
+  // Additional validation to ensure it's a valid date
+  const parsed = new Date(date);
+  if (isNaN(parsed.getTime())) {
+    throw new Error(`Invalid date value: ${date}`);
+  }
+  return true;
+}
+
 export interface GoogleAdsCampaign {
   id: string;
   name: string;
@@ -120,6 +138,10 @@ export class GoogleAdsClient {
   }
 
   async getCampaignMetrics(startDate: string, endDate: string): Promise<MetricRow[]> {
+    // Validate date formats to prevent GAQL injection
+    validateDateFormat(startDate);
+    validateDateFormat(endDate);
+
     const query = `
       SELECT
         campaign.id,
@@ -180,6 +202,10 @@ export class GoogleAdsClient {
     totalConversions: number;
     totalConversionValue: number;
   }> {
+    // Validate date formats to prevent GAQL injection
+    validateDateFormat(startDate);
+    validateDateFormat(endDate);
+
     const query = `
       SELECT
         metrics.impressions,

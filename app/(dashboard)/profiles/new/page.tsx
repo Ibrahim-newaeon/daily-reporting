@@ -6,12 +6,18 @@ import Link from 'next/link';
 import { Platform } from '@/lib/types';
 import { platformDisplayNames } from '@/lib/utils';
 
-const PLATFORMS: Platform[] = ['ga4', 'google_ads', 'meta', 'linkedin'];
+// All supported platforms including TikTok and Snapchat
+const PLATFORMS: Platform[] = ['ga4', 'google_ads', 'meta', 'linkedin', 'tiktok', 'snapchat'];
+
+// Validation constants
+const MAX_NAME_LENGTH = 100;
+const MAX_DESCRIPTION_LENGTH = 500;
 
 export default function NewProfilePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -24,26 +30,54 @@ export default function NewProfilePage() {
         ? prev.filter(p => p !== platform)
         : [...prev, platform]
     );
+    // Clear platform error when user selects one
+    if (validationErrors.platforms) {
+      setValidationErrors(prev => ({ ...prev, platforms: '' }));
+    }
+  };
+
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    // Validate name
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      errors.name = 'Profile name is required';
+    } else if (trimmedName.length > MAX_NAME_LENGTH) {
+      errors.name = `Profile name must be ${MAX_NAME_LENGTH} characters or less`;
+    }
+
+    // Validate description
+    if (description.length > MAX_DESCRIPTION_LENGTH) {
+      errors.description = `Description must be ${MAX_DESCRIPTION_LENGTH} characters or less`;
+    }
+
+    // Validate platforms
+    if (selectedPlatforms.length === 0) {
+      errors.platforms = 'Please select at least one platform';
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
 
-    if (selectedPlatforms.length === 0) {
-      setError('Please select at least one platform');
-      setLoading(false);
+    if (!validateForm()) {
       return;
     }
+
+    setLoading(true);
 
     try {
       const response = await fetch('/api/profiles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name,
-          description,
+          name: name.trim(),
+          description: description.trim(),
           platforms: selectedPlatforms,
           isActive,
         }),
@@ -58,7 +92,8 @@ export default function NewProfilePage() {
       router.push(`/profiles/${data.data.profile.id}`);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create profile';
-      setError(errorMessage);
+      // Sanitize error message - don't display HTML content
+      setError(errorMessage.replace(/<[^>]*>/g, ''));
     } finally {
       setLoading(false);
     }
@@ -94,11 +129,27 @@ export default function NewProfilePage() {
               id="name"
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="input"
+              onChange={(e) => {
+                setName(e.target.value);
+                if (validationErrors.name) {
+                  setValidationErrors(prev => ({ ...prev, name: '' }));
+                }
+              }}
+              className={`input ${validationErrors.name ? 'border-red-500 focus:ring-red-500' : ''}`}
               placeholder="e.g., Weekly Marketing Report"
+              maxLength={MAX_NAME_LENGTH}
               required
+              aria-invalid={!!validationErrors.name}
+              aria-describedby={validationErrors.name ? 'name-error' : undefined}
             />
+            {validationErrors.name && (
+              <p id="name-error" className="mt-1 text-sm text-red-600" role="alert">
+                {validationErrors.name}
+              </p>
+            )}
+            <p className="mt-1 text-xs text-gray-500">
+              {name.length}/{MAX_NAME_LENGTH} characters
+            </p>
           </div>
 
           {/* Description */}
@@ -107,26 +158,49 @@ export default function NewProfilePage() {
             <textarea
               id="description"
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="input"
+              onChange={(e) => {
+                setDescription(e.target.value);
+                if (validationErrors.description) {
+                  setValidationErrors(prev => ({ ...prev, description: '' }));
+                }
+              }}
+              className={`input ${validationErrors.description ? 'border-red-500 focus:ring-red-500' : ''}`}
               rows={3}
               placeholder="Brief description of this report profile..."
+              maxLength={MAX_DESCRIPTION_LENGTH}
+              aria-invalid={!!validationErrors.description}
+              aria-describedby={validationErrors.description ? 'description-error' : undefined}
             />
+            {validationErrors.description && (
+              <p id="description-error" className="mt-1 text-sm text-red-600" role="alert">
+                {validationErrors.description}
+              </p>
+            )}
+            <p className="mt-1 text-xs text-gray-500">
+              {description.length}/{MAX_DESCRIPTION_LENGTH} characters
+            </p>
           </div>
 
           {/* Platforms */}
-          <div>
-            <label className="label">Data Sources</label>
+          <fieldset>
+            <legend className="label">Data Sources</legend>
             <p className="text-sm text-gray-500 mb-3">Select the platforms to include in this report</p>
-            <div className="grid grid-cols-2 gap-3">
+            <div
+              className="grid grid-cols-2 gap-3"
+              role="group"
+              aria-describedby={validationErrors.platforms ? 'platforms-error' : undefined}
+            >
               {PLATFORMS.map((platform) => (
                 <button
                   key={platform}
                   type="button"
                   onClick={() => handlePlatformToggle(platform)}
+                  aria-pressed={selectedPlatforms.includes(platform)}
                   className={`p-4 border rounded-lg text-left transition-colors ${
                     selectedPlatforms.includes(platform)
                       ? 'border-primary-500 bg-primary-50 text-primary-700'
+                      : validationErrors.platforms
+                      ? 'border-red-300 hover:border-red-400'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
@@ -149,7 +223,12 @@ export default function NewProfilePage() {
                 </button>
               ))}
             </div>
-          </div>
+            {validationErrors.platforms && (
+              <p id="platforms-error" className="mt-2 text-sm text-red-600" role="alert">
+                {validationErrors.platforms}
+              </p>
+            )}
+          </fieldset>
 
           {/* Active Status */}
           <div className="flex items-center gap-3">

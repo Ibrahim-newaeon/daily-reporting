@@ -4,6 +4,73 @@ import { Storage } from '@google-cloud/storage';
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 import axios from 'axios';
+import * as crypto from 'crypto';
+
+// ============================================================================
+// TOKEN ENCRYPTION (mirrors lib/security.ts for Cloud Functions)
+// ============================================================================
+const ENCRYPTION_ALGORITHM = 'aes-256-gcm';
+const IV_LENGTH = 16;
+
+/**
+ * Validate date format to prevent injection attacks in GAQL queries
+ */
+function validateDateFormat(date: string): boolean {
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(date)) {
+    throw new Error(`Invalid date format: ${date}. Expected YYYY-MM-DD`);
+  }
+  const parsed = new Date(date);
+  if (isNaN(parsed.getTime())) {
+    throw new Error(`Invalid date value: ${date}`);
+  }
+  return true;
+}
+
+function getEncryptionKey(): Buffer {
+  const key = process.env.TOKEN_ENCRYPTION_KEY;
+  if (!key) {
+    throw new Error('TOKEN_ENCRYPTION_KEY environment variable is not set');
+  }
+  if (key.length !== 64) {
+    throw new Error('TOKEN_ENCRYPTION_KEY must be 64 hex characters (32 bytes)');
+  }
+  return Buffer.from(key, 'hex');
+}
+
+function encryptToken(token: string): string {
+  const key = getEncryptionKey();
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, key, iv);
+
+  let encrypted = cipher.update(token, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  const authTag = cipher.getAuthTag().toString('hex');
+
+  return `${iv.toString('hex')}:${authTag}:${encrypted}`;
+}
+
+function decryptToken(encryptedToken: string): string {
+  // Check if token is already plaintext (for backwards compatibility)
+  const parts = encryptedToken.split(':');
+  if (parts.length !== 3 || parts[0].length !== 32) {
+    return encryptedToken; // Return as-is if not encrypted format
+  }
+
+  const key = getEncryptionKey();
+  const [ivHex, authTagHex, encryptedData] = parts;
+
+  const iv = Buffer.from(ivHex, 'hex');
+  const authTag = Buffer.from(authTagHex, 'hex');
+
+  const decipher = crypto.createDecipheriv(ENCRYPTION_ALGORITHM, key, iv);
+  decipher.setAuthTag(authTag);
+
+  let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+
+  return decrypted;
+}
 
 // Initialize Firebase Admin if not already initialized
 if (!admin.apps.length) {
@@ -17,6 +84,8 @@ const storage = new Storage();
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const META_TOKEN_URL = 'https://graph.facebook.com/v18.0/oauth/access_token';
 const LINKEDIN_TOKEN_URL = 'https://www.linkedin.com/oauth/v2/accessToken';
+const TIKTOK_TOKEN_URL = 'https://business-api.tiktok.com/open_api/v1.3/oauth2/refresh_token/';
+const SNAP_TOKEN_URL = 'https://accounts.snapchat.com/login/oauth2/access_token';
 
 // Retry configuration
 const MAX_RETRIES = 3;
@@ -119,10 +188,23 @@ export const generateReportHttp = functions
     memory: '2GB',
   })
   .https.onRequest(async (req, res) => {
-    // Verify authorization
+    // Verify authorization with proper token validation
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(401).json({ error: 'Unauthorized: Missing or invalid authorization header' });
+      return;
+    }
+
+    // Extract and verify the Firebase ID token
+    const idToken = authHeader.substring(7);
+    let authenticatedUserId: string;
+
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(idToken);
+      authenticatedUserId = decodedToken.uid;
+    } catch (authError) {
+      console.error('Token verification failed:', authError);
+      res.status(401).json({ error: 'Unauthorized: Invalid or expired token' });
       return;
     }
 
@@ -131,6 +213,12 @@ export const generateReportHttp = functions
 
       if (!profileId || !userId) {
         res.status(400).json({ error: 'Missing profileId or userId' });
+        return;
+      }
+
+      // Verify the authenticated user matches the requested userId
+      if (authenticatedUserId !== userId) {
+        res.status(403).json({ error: 'Forbidden: Cannot generate reports for other users' });
         return;
       }
 
@@ -343,6 +431,51 @@ async function refreshLinkedInToken(refreshToken: string): Promise<string | null
 }
 
 /**
+ * Refresh TikTok OAuth token
+ */
+async function refreshTikTokToken(refreshToken: string): Promise<string | null> {
+  try {
+    const response = await axios.post(TIKTOK_TOKEN_URL, {
+      app_id: process.env.TIKTOK_APP_ID || '',
+      secret: process.env.TIKTOK_APP_SECRET || '',
+      refresh_token: refreshToken,
+    }, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (response.data.code !== 0) {
+      console.error('TikTok token refresh failed:', response.data.message);
+      return null;
+    }
+
+    return response.data.data.access_token;
+  } catch (error) {
+    console.error('Failed to refresh TikTok token:', error);
+    return null;
+  }
+}
+
+/**
+ * Refresh Snapchat OAuth token
+ */
+async function refreshSnapToken(refreshToken: string): Promise<string | null> {
+  try {
+    const response = await axios.post(SNAP_TOKEN_URL, new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+      client_id: process.env.SNAP_CLIENT_ID || '',
+      client_secret: process.env.SNAP_CLIENT_SECRET || '',
+    }), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    return response.data.access_token;
+  } catch (error) {
+    console.error('Failed to refresh Snap token:', error);
+    return null;
+  }
+}
+
+/**
  * Fetch GA4 metrics using the Data API v1beta
  */
 async function fetchGA4Metrics(
@@ -390,6 +523,10 @@ async function fetchGoogleAdsMetrics(
   startDate: string,
   endDate: string
 ): Promise<MetricData> {
+  // Validate date formats to prevent GAQL injection
+  validateDateFormat(startDate);
+  validateDateFormat(endDate);
+
   const query = `
     SELECT
       metrics.impressions,
@@ -533,17 +670,123 @@ async function fetchLinkedInAdsMetrics(
 }
 
 /**
+ * Fetch TikTok Ads metrics
+ */
+async function fetchTikTokAdsMetrics(
+  accessToken: string,
+  advertiserId: string,
+  startDate: string,
+  endDate: string
+): Promise<MetricData> {
+  const response = await axios.get(
+    'https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/',
+    {
+      headers: {
+        'Access-Token': accessToken,
+        'Content-Type': 'application/json',
+      },
+      params: {
+        advertiser_id: advertiserId,
+        report_type: 'BASIC',
+        data_level: 'AUCTION_ADVERTISER',
+        dimensions: JSON.stringify(['advertiser_id']),
+        metrics: JSON.stringify([
+          'spend',
+          'impressions',
+          'clicks',
+          'conversion',
+          'complete_payment',
+          'complete_payment_value',
+        ]),
+        start_date: startDate,
+        end_date: endDate,
+      },
+    }
+  );
+
+  if (response.data.code !== 0) {
+    throw new Error(response.data.message || 'TikTok API error');
+  }
+
+  const data = response.data.data?.list?.[0]?.metrics || {};
+
+  return {
+    platform: 'tiktok',
+    spend: parseFloat(data.spend || '0'),
+    impressions: parseInt(data.impressions || '0', 10),
+    clicks: parseInt(data.clicks || '0', 10),
+    conversions: parseInt(data.conversion || '0', 10) + parseInt(data.complete_payment || '0', 10),
+    conversionValue: parseFloat(data.complete_payment_value || '0'),
+  };
+}
+
+/**
+ * Fetch Snapchat Ads metrics
+ */
+async function fetchSnapAdsMetrics(
+  accessToken: string,
+  adAccountId: string,
+  startDate: string,
+  endDate: string
+): Promise<MetricData> {
+  const response = await axios.get(
+    `https://adsapi.snapchat.com/v1/adaccounts/${adAccountId}/stats`,
+    {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      params: {
+        granularity: 'TOTAL',
+        start_time: `${startDate}T00:00:00.000Z`,
+        end_time: `${endDate}T23:59:59.999Z`,
+        fields: 'impressions,swipes,spend,conversion_purchases,conversion_purchases_value,conversion_add_cart,conversion_sign_ups',
+      },
+    }
+  );
+
+  const stats = response.data.total_stats?.[0]?.stats || {};
+
+  // Snap uses "swipes" as clicks and returns spend in micro-currency
+  const conversions = parseInt(stats.conversion_purchases || '0', 10) +
+                     parseInt(stats.conversion_add_cart || '0', 10) +
+                     parseInt(stats.conversion_sign_ups || '0', 10);
+
+  return {
+    platform: 'snapchat',
+    spend: parseFloat(stats.spend || '0') / 1000000, // Convert micro-currency
+    impressions: parseInt(stats.impressions || '0', 10),
+    clicks: parseInt(stats.swipes || '0', 10),
+    conversions,
+    conversionValue: parseFloat(stats.conversion_purchases_value || '0') / 1000000,
+  };
+}
+
+/**
  * Update user's token in Firestore after refresh
+ * Tokens are encrypted before storage for security
  */
 async function updateUserToken(
   userId: string,
   platform: string,
-  newAccessToken: string
+  newAccessToken: string,
+  newRefreshToken?: string
 ): Promise<void> {
-  await db.collection('users').doc(userId).update({
-    [`connectedAccounts.${platform}.accessToken`]: newAccessToken,
+  // Encrypt the access token before storing
+  const encryptedAccessToken = encryptToken(newAccessToken);
+
+  const updateData: Record<string, unknown> = {
+    [`connectedAccounts.${platform}.accessToken`]: encryptedAccessToken,
+    [`connectedAccounts.${platform}.tokenEncrypted`]: true,
     [`connectedAccounts.${platform}.updatedAt`]: new Date(),
-  });
+  };
+
+  // Also encrypt and update refresh token if provided
+  if (newRefreshToken) {
+    updateData[`connectedAccounts.${platform}.refreshToken`] = encryptToken(newRefreshToken);
+  }
+
+  await db.collection('users').doc(userId).update(updateData);
 }
 
 /**
@@ -578,7 +821,25 @@ async function fetchMetricsFromPlatforms(
       continue;
     }
 
-    let accessToken = account.accessToken;
+    // Decrypt the access token if it's encrypted
+    let accessToken: string;
+    try {
+      accessToken = decryptToken(account.accessToken);
+    } catch (decryptError) {
+      console.error(`Failed to decrypt token for ${platform}:`, decryptError);
+      continue;
+    }
+
+    // Also decrypt refresh token if available
+    let refreshToken: string | undefined;
+    if (account.refreshToken) {
+      try {
+        refreshToken = decryptToken(account.refreshToken);
+      } catch {
+        // Refresh token might be in old format, use as-is
+        refreshToken = account.refreshToken;
+      }
+    }
 
     try {
       // Try to fetch metrics with current token
@@ -602,6 +863,14 @@ async function fetchMetricsFromPlatforms(
             if (!account.accountId) throw new Error('LinkedIn ad account ID not configured');
             return fetchLinkedInAdsMetrics(accessToken, account.accountId, startDateStr, endDateStr);
 
+          case 'tiktok':
+            if (!account.accountId) throw new Error('TikTok advertiser ID not configured');
+            return fetchTikTokAdsMetrics(accessToken, account.accountId, startDateStr, endDateStr);
+
+          case 'snapchat':
+            if (!account.accountId) throw new Error('Snapchat ad account ID not configured');
+            return fetchSnapAdsMetrics(accessToken, account.accountId, startDateStr, endDateStr);
+
           default:
             throw new Error(`Unknown platform: ${platform}`);
         }
@@ -621,16 +890,26 @@ async function fetchMetricsFromPlatforms(
           switch (platform) {
             case 'ga4':
             case 'google_ads':
-              if (account.refreshToken) {
-                newToken = await refreshGoogleToken(account.refreshToken);
+              if (refreshToken) {
+                newToken = await refreshGoogleToken(refreshToken);
               }
               break;
             case 'meta':
               newToken = await refreshMetaToken(accessToken);
               break;
             case 'linkedin':
-              if (account.refreshToken) {
-                newToken = await refreshLinkedInToken(account.refreshToken);
+              if (refreshToken) {
+                newToken = await refreshLinkedInToken(refreshToken);
+              }
+              break;
+            case 'tiktok':
+              if (refreshToken) {
+                newToken = await refreshTikTokToken(refreshToken);
+              }
+              break;
+            case 'snapchat':
+              if (refreshToken) {
+                newToken = await refreshSnapToken(refreshToken);
               }
               break;
           }
@@ -812,6 +1091,8 @@ function getPlatformDisplayName(platform: string): string {
     google_ads: 'Google Ads',
     meta: 'Meta Ads',
     linkedin: 'LinkedIn Ads',
+    tiktok: 'TikTok Ads',
+    snapchat: 'Snapchat Ads',
   };
   return names[platform] || platform;
 }
