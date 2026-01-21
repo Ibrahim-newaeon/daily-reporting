@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/auth';
 import { getAdminDb } from '@/lib/firebase';
 import { insertRows } from '@/lib/bigquery';
-import { Platform, MetricRow } from '@/lib/types';
+import { Platform, MetricRow, PlatformSchema } from '@/lib/types';
 import { createGA4Client } from '@/lib/apis/ga4';
 import { createGoogleAdsClient } from '@/lib/apis/google-ads';
 import { createMetaAdsClient } from '@/lib/apis/meta-ads';
@@ -10,6 +10,10 @@ import { createLinkedInAdsClient } from '@/lib/apis/linkedin-ads';
 import { createTikTokAdsClient } from '@/lib/apis/tiktok-ads';
 import { createSnapAdsClient } from '@/lib/apis/snap-ads';
 import { getDateRange } from '@/lib/utils';
+import { checkRateLimit, RateLimits, decryptToken, isEncryptedToken } from '@/lib/security';
+
+// Valid date range options
+const VALID_DATE_RANGES = ['today', 'yesterday', 'last7days', 'last30days', 'thisMonth', 'lastMonth'] as const;
 
 // Configure route segment for long-running sync operations
 export const maxDuration = 120; // 120 second timeout for syncing multiple platforms
@@ -25,6 +29,26 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Apply rate limiting for sync operations
+  const rateLimit = checkRateLimit(
+    `sync:${authResult.userId}`,
+    RateLimits.DATA_SYNC.limit,
+    RateLimits.DATA_SYNC.windowMs
+  );
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { success: false, error: 'Rate limit exceeded. Please try again later.' },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(rateLimit.retryAfter || 60),
+          'X-RateLimit-Remaining': '0',
+        },
+      }
+    );
+  }
+
   try {
     const body = await request.json();
     const { platforms, dateRange = 'last7days', profileId } = body;
@@ -32,6 +56,23 @@ export async function POST(request: NextRequest) {
     if (!platforms || !Array.isArray(platforms) || platforms.length === 0) {
       return NextResponse.json(
         { success: false, error: 'At least one platform is required' },
+        { status: 400 }
+      );
+    }
+
+    // Validate date range
+    if (!VALID_DATE_RANGES.includes(dateRange)) {
+      return NextResponse.json(
+        { success: false, error: `Invalid dateRange. Must be one of: ${VALID_DATE_RANGES.join(', ')}` },
+        { status: 400 }
+      );
+    }
+
+    // Validate platforms
+    const validPlatforms = platforms.filter((p: string) => PlatformSchema.safeParse(p).success);
+    if (validPlatforms.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'No valid platforms provided' },
         { status: 400 }
       );
     }
@@ -53,7 +94,7 @@ export async function POST(request: NextRequest) {
     const results: { platform: Platform; success: boolean; rowCount?: number; error?: string }[] = [];
     const allMetrics: MetricRow[] = [];
 
-    for (const platform of platforms as Platform[]) {
+    for (const platform of validPlatforms as Platform[]) {
       const account = connectedAccounts[platform];
 
       if (!account?.connected || !account?.accessToken) {
@@ -66,11 +107,38 @@ export async function POST(request: NextRequest) {
       }
 
       try {
+        // Decrypt the access token if it's encrypted
+        let accessToken = account.accessToken;
+        if (account.tokenEncrypted || isEncryptedToken(account.accessToken)) {
+          try {
+            accessToken = decryptToken(account.accessToken);
+          } catch (decryptError) {
+            console.error(`Failed to decrypt token for ${platform}:`, decryptError);
+            results.push({
+              platform,
+              success: false,
+              error: 'Token decryption failed. Please reconnect your account.',
+            });
+            continue;
+          }
+        }
+
+        // Decrypt refresh token if available and encrypted
+        let refreshToken = account.refreshToken;
+        if (refreshToken && (account.tokenEncrypted || isEncryptedToken(refreshToken))) {
+          try {
+            refreshToken = decryptToken(refreshToken);
+          } catch {
+            // Refresh token decryption failure is not critical
+            refreshToken = undefined;
+          }
+        }
+
         let metrics: MetricRow[] = [];
 
         switch (platform) {
           case 'ga4': {
-            const client = createGA4Client(account.accessToken, account.refreshToken);
+            const client = createGA4Client(accessToken, refreshToken);
             metrics = await client.getMetrics(
               account.propertyId || process.env.GA4_PROPERTY_ID || '',
               startDate,
@@ -80,32 +148,32 @@ export async function POST(request: NextRequest) {
           }
 
           case 'google_ads': {
-            const client = createGoogleAdsClient(account.accessToken, account.accountId);
+            const client = createGoogleAdsClient(accessToken, account.accountId);
             metrics = await client.getCampaignMetrics(startDate, endDate);
             break;
           }
 
           case 'meta': {
-            const client = createMetaAdsClient(account.accessToken, account.accountId || '');
+            const client = createMetaAdsClient(accessToken, account.accountId || '');
             metrics = await client.getCampaignMetrics(startDate, endDate);
             break;
           }
 
           case 'linkedin': {
-            const client = createLinkedInAdsClient(account.accessToken, account.accountId || '');
+            const client = createLinkedInAdsClient(accessToken, account.accountId || '');
             metrics = await client.getCampaignMetrics(startDate, endDate);
             break;
           }
 
           case 'tiktok': {
-            const client = createTikTokAdsClient(account.accessToken, account.accountId || '');
+            const client = createTikTokAdsClient(accessToken, account.accountId || '');
             metrics = await client.getCampaignMetrics(startDate, endDate);
             break;
           }
 
           case 'snapchat': {
             const client = createSnapAdsClient(
-              account.accessToken,
+              accessToken,
               account.accountId || '',
               account.propertyId || '' // Using propertyId for organizationId
             );

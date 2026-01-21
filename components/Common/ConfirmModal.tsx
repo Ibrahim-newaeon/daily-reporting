@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useId, useCallback } from 'react';
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -26,22 +26,67 @@ export default function ConfirmModal({
   loading = false,
 }: ConfirmModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const previousActiveElement = useRef<HTMLElement | null>(null);
+
+  // Generate unique IDs for accessibility
+  const titleId = useId();
+  const descId = useId();
+
+  // Focus trap handler
+  const handleTabKey = useCallback((e: KeyboardEvent) => {
+    if (!modalRef.current) return;
+
+    const focusableElements = modalRef.current.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+
+    if (focusableElements.length === 0) return;
+
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+
+    if (e.shiftKey && document.activeElement === firstElement) {
+      e.preventDefault();
+      lastElement.focus();
+    } else if (!e.shiftKey && document.activeElement === lastElement) {
+      e.preventDefault();
+      firstElement.focus();
+    }
+  }, []);
 
   useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !loading) {
+        onClose();
+      } else if (e.key === 'Tab') {
+        handleTabKey(e);
+      }
     };
 
     if (isOpen) {
-      document.addEventListener('keydown', handleEscape);
+      // Store the previously focused element
+      previousActiveElement.current = document.activeElement as HTMLElement;
+
+      document.addEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'hidden';
+
+      // Focus the cancel button when modal opens
+      setTimeout(() => {
+        cancelButtonRef.current?.focus();
+      }, 0);
     }
 
     return () => {
-      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'unset';
+
+      // Restore focus to the previously focused element
+      if (previousActiveElement.current) {
+        previousActiveElement.current.focus();
+      }
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, loading, handleTabKey]);
 
   if (!isOpen) return null;
 
@@ -76,11 +121,18 @@ export default function ConfirmModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      aria-describedby={descId}
+    >
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
-        onClick={onClose}
+        onClick={loading ? undefined : onClose}
+        aria-hidden="true"
       />
 
       {/* Modal */}
@@ -90,17 +142,21 @@ export default function ConfirmModal({
           className="relative bg-white rounded-xl shadow-xl max-w-md w-full p-6 transform transition-all"
         >
           <div className="flex items-start gap-4">
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${iconColors[variant]}`}>
+            <div
+              className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${iconColors[variant]}`}
+              aria-hidden="true"
+            >
               {icons[variant]}
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-              <p className="mt-2 text-sm text-gray-600">{message}</p>
+              <h3 id={titleId} className="text-lg font-semibold text-gray-900">{title}</h3>
+              <p id={descId} className="mt-2 text-sm text-gray-600">{message}</p>
             </div>
           </div>
 
           <div className="mt-6 flex justify-end gap-3">
             <button
+              ref={cancelButtonRef}
               type="button"
               onClick={onClose}
               disabled={loading}
