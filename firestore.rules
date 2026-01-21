@@ -1,0 +1,116 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =====================================================
+    // HELPER FUNCTIONS
+    // =====================================================
+
+    // Check if the user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if the user owns this resource
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Check if the request is coming from the server (admin SDK)
+    // Server requests don't have auth context but use admin credentials
+    function isServerRequest() {
+      return false; // Admin SDK bypasses rules entirely
+    }
+
+    // Validate that a field is a valid timestamp
+    function isValidTimestamp(field) {
+      return field is timestamp;
+    }
+
+    // Validate email format (basic check)
+    function isValidEmail(email) {
+      return email is string && email.matches('.*@.*\\..*');
+    }
+
+    // =====================================================
+    // USER DOCUMENTS
+    // =====================================================
+
+    match /users/{userId} {
+      // Users can only read/write their own document
+      allow read: if isOwner(userId);
+
+      // Allow create during signup (auth.uid will match userId)
+      allow create: if isOwner(userId) &&
+        request.resource.data.keys().hasAll(['email', 'createdAt']) &&
+        isValidEmail(request.resource.data.email);
+
+      // Allow update of own document (but not changing certain fields)
+      allow update: if isOwner(userId) &&
+        // Cannot change these fields
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['id', 'email', 'createdAt']);
+
+      // Users cannot delete their own document (soft delete only)
+      allow delete: if false;
+
+      // =====================================================
+      // USER SUB-COLLECTIONS
+      // =====================================================
+
+      // Report Profiles
+      match /reportProfiles/{profileId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+          request.resource.data.keys().hasAll(['name', 'platforms', 'createdAt']);
+        allow update: if isOwner(userId);
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    // =====================================================
+    // GENERATED REPORTS
+    // =====================================================
+
+    match /generatedReports/{reportId} {
+      // Users can only read reports they own
+      allow read: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+
+      // Only server can write reports (via Admin SDK which bypasses rules)
+      allow create, update, delete: if false;
+    }
+
+    // =====================================================
+    // AUDIT LOGS
+    // =====================================================
+
+    match /auditLogs/{logId} {
+      // Users can read their own audit logs
+      allow read: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+
+      // Only server can write audit logs
+      allow create, update, delete: if false;
+    }
+
+    // =====================================================
+    // HEALTH CHECK (for monitoring)
+    // =====================================================
+
+    match /_health/{document=**} {
+      // Allow read for health checks
+      allow read: if true;
+      // Only server can write
+      allow write: if false;
+    }
+
+    // =====================================================
+    // DEFAULT DENY
+    // =====================================================
+
+    // Deny access to any other documents
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
