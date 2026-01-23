@@ -12,6 +12,7 @@ interface HealthCheckResult {
   uptime: number;
   checks: {
     database: HealthStatus;
+    redis: HealthStatus;
     memory: HealthStatus;
     environment: HealthStatus;
   };
@@ -42,6 +43,38 @@ async function checkDatabase(): Promise<HealthStatus> {
     return {
       status: 'fail',
       message: 'Database connection failed',
+      latencyMs: Date.now() - start,
+    };
+  }
+}
+
+/**
+ * Check Redis connectivity
+ */
+async function checkRedis(): Promise<HealthStatus> {
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) {
+    return {
+      status: 'warn',
+      message: 'Redis not configured (using in-memory rate limiting)',
+    };
+  }
+
+  const start = Date.now();
+  try {
+    const { createClient } = await import('redis');
+    const client = createClient({ url: redisUrl });
+    await client.connect();
+    await client.ping();
+    await client.quit();
+    return {
+      status: 'pass',
+      latencyMs: Date.now() - start,
+    };
+  } catch (error) {
+    return {
+      status: 'fail',
+      message: 'Redis connection failed',
       latencyMs: Date.now() - start,
     };
   }
@@ -130,6 +163,7 @@ function determineOverallStatus(
 export async function GET() {
   const checks = {
     database: await checkDatabase(),
+    redis: await checkRedis(),
     memory: checkMemory(),
     environment: checkEnvironment(),
   };
