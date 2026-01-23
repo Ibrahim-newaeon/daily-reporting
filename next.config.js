@@ -1,9 +1,13 @@
+const { withSentryConfig } = require('@sentry/nextjs');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   // Enable standalone output for Docker deployment
   output: 'standalone',
+  // Enable instrumentation hook for Sentry
   experimental: {
+    instrumentationHook: true,
     serverComponentsExternalPackages: [
       'puppeteer-core',
       '@google-cloud/bigquery',
@@ -53,11 +57,11 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.sentry.io",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https://storage.googleapis.com https://lh3.googleusercontent.com",
               "font-src 'self'",
-              "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com",
+              "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.sentry.io",
               "frame-ancestors 'none'",
             ].join('; '),
           },
@@ -87,4 +91,23 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+// Sentry configuration options
+const sentryWebpackPluginOptions = {
+  // Suppress source map upload logs
+  silent: true,
+  // Organization and project from environment
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  // Auth token for source map uploads
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  // Hide source maps from generated client bundles
+  hideSourceMaps: true,
+  // Disable source map uploading during development
+  disableServerWebpackPlugin: process.env.NODE_ENV !== 'production',
+  disableClientWebpackPlugin: process.env.NODE_ENV !== 'production',
+};
+
+// Export with Sentry wrapper (only if Sentry is configured)
+module.exports = process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN
+  ? withSentryConfig(nextConfig, sentryWebpackPluginOptions)
+  : nextConfig;

@@ -16,10 +16,14 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Check if the request is coming from the server (admin SDK)
-    // Server requests don't have auth context but use admin credentials
-    function isServerRequest() {
-      return false; // Admin SDK bypasses rules entirely
+    // Check if the resource belongs to authenticated user
+    function isResourceOwner() {
+      return isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    // Check if incoming data has valid userId
+    function hasValidUserId() {
+      return request.resource.data.userId == request.auth.uid;
     }
 
     // Validate that a field is a valid timestamp
@@ -30,6 +34,11 @@ service cloud.firestore {
     // Validate email format (basic check)
     function isValidEmail(email) {
       return email is string && email.matches('.*@.*\\..*');
+    }
+
+    // Validate platform is one of the supported platforms
+    function isValidPlatform(platform) {
+      return platform in ['google-ads', 'meta-ads', 'tiktok-ads', 'snap-ads', 'linkedin-ads', 'ga4'];
     }
 
     // =====================================================
@@ -65,6 +74,76 @@ service cloud.firestore {
         allow update: if isOwner(userId);
         allow delete: if isOwner(userId);
       }
+
+      // User Settings
+      match /settings/{settingId} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId);
+      }
+    }
+
+    // =====================================================
+    // OAUTH TOKENS (Encrypted - Server writes only)
+    // =====================================================
+
+    match /tokens/{tokenId} {
+      // Users can read their own tokens
+      allow read: if isResourceOwner();
+
+      // Only server can write tokens (Admin SDK bypasses rules)
+      // This ensures tokens are always encrypted by the server
+      allow create, update, delete: if false;
+    }
+
+    // =====================================================
+    // AD ACCOUNT CONNECTIONS
+    // =====================================================
+
+    match /connections/{connectionId} {
+      // Users can read their own connections
+      allow read: if isResourceOwner();
+
+      // Users can create connections for themselves
+      allow create: if isAuthenticated() &&
+        hasValidUserId() &&
+        request.resource.data.keys().hasAll(['userId', 'platform', 'accountId', 'accountName', 'createdAt']) &&
+        isValidPlatform(request.resource.data.platform);
+
+      // Users can update their own connections (cannot change userId, platform, accountId)
+      allow update: if isResourceOwner() &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['userId', 'platform', 'accountId']);
+
+      // Users can delete their own connections
+      allow delete: if isResourceOwner();
+    }
+
+    // =====================================================
+    // REPORTS
+    // =====================================================
+
+    match /reports/{reportId} {
+      // Users can read their own reports
+      allow read: if isResourceOwner();
+
+      // Users can create reports for themselves
+      allow create: if isAuthenticated() &&
+        hasValidUserId() &&
+        request.resource.data.keys().hasAll(['userId', 'name', 'type', 'createdAt']);
+
+      // Users can update their own reports (cannot change userId, createdAt)
+      allow update: if isResourceOwner() &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['userId', 'createdAt']);
+
+      // Users can delete their own reports
+      allow delete: if isResourceOwner();
+
+      // Report schedules subcollection
+      match /schedules/{scheduleId} {
+        allow read: if isAuthenticated() &&
+          get(/databases/$(database)/documents/reports/$(reportId)).data.userId == request.auth.uid;
+        allow write: if isAuthenticated() &&
+          get(/databases/$(database)/documents/reports/$(reportId)).data.userId == request.auth.uid;
+      }
     }
 
     // =====================================================
@@ -73,11 +152,47 @@ service cloud.firestore {
 
     match /generatedReports/{reportId} {
       // Users can only read reports they own
-      allow read: if isAuthenticated() &&
-        resource.data.userId == request.auth.uid;
+      allow read: if isResourceOwner();
 
       // Only server can write reports (via Admin SDK which bypasses rules)
       allow create, update, delete: if false;
+    }
+
+    // =====================================================
+    // REPORT TEMPLATES
+    // =====================================================
+
+    match /templates/{templateId} {
+      // Public templates can be read by anyone authenticated
+      // Private templates only by owner
+      allow read: if isAuthenticated() &&
+        (resource.data.isPublic == true || resource.data.userId == request.auth.uid);
+
+      // Users can create templates
+      allow create: if isAuthenticated() && hasValidUserId();
+
+      // Only owners can update/delete
+      allow update: if isResourceOwner();
+      allow delete: if isResourceOwner();
+    }
+
+    // =====================================================
+    // NOTIFICATIONS
+    // =====================================================
+
+    match /notifications/{notificationId} {
+      // Users can read their own notifications
+      allow read: if isResourceOwner();
+
+      // Users can only update read status
+      allow update: if isResourceOwner() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
+
+      // Users can delete their own notifications
+      allow delete: if isResourceOwner();
+
+      // Only server can create notifications
+      allow create: if false;
     }
 
     // =====================================================
@@ -86,8 +201,7 @@ service cloud.firestore {
 
     match /auditLogs/{logId} {
       // Users can read their own audit logs
-      allow read: if isAuthenticated() &&
-        resource.data.userId == request.auth.uid;
+      allow read: if isResourceOwner();
 
       // Only server can write audit logs
       allow create, update, delete: if false;
