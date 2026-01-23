@@ -72,9 +72,10 @@ export default function DashboardPage() {
   };
 
   // Aggregate metrics by date for chart
-  const chartData = metrics.reduce((acc: Record<string, Record<string, number>>, item) => {
+  type ChartDataItem = { date: string } & Record<string, number>;
+  const chartData = metrics.reduce((acc: Record<string, ChartDataItem>, item) => {
     if (!acc[item.date]) {
-      acc[item.date] = { date: item.date } as Record<string, number>;
+      acc[item.date] = { date: item.date } as ChartDataItem;
     }
     acc[item.date][`${item.platform}_spend`] = (acc[item.date][`${item.platform}_spend`] || 0) + item.spend;
     acc[item.date]['total_spend'] = (acc[item.date]['total_spend'] || 0) + item.spend;
@@ -82,7 +83,7 @@ export default function DashboardPage() {
   }, {});
 
   const chartDataArray = Object.values(chartData).sort((a, b) =>
-    String(a.date).localeCompare(String(b.date))
+    a.date.localeCompare(b.date)
   );
 
   return (

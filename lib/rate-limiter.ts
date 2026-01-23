@@ -166,11 +166,13 @@ function checkRateLimitMemory(
 // Clean up old memory entries periodically
 setInterval(() => {
   const now = Date.now();
-  for (const [key, entry] of memoryStore.entries()) {
+  const keysToDelete: string[] = [];
+  memoryStore.forEach((entry, key) => {
     if (now > entry.resetAt) {
-      memoryStore.delete(key);
+      keysToDelete.push(key);
     }
-  }
+  });
+  keysToDelete.forEach(key => memoryStore.delete(key));
 }, 60000); // Clean every minute
 
 /**

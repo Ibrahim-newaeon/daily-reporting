@@ -32,8 +32,9 @@ export async function GET(request: NextRequest) {
     const status = platforms.map(platform => {
       const account = connectedAccounts[platform];
       const isConnected = account?.connected ?? false;
-      const isExpired = account?.expiresAt
-        ? new Date(account.expiresAt.toDate?.() || account.expiresAt) < new Date()
+      const expiresAt = account?.expiresAt;
+      const isExpired = expiresAt
+        ? new Date(typeof expiresAt === 'object' && 'toDate' in expiresAt ? (expiresAt as { toDate: () => Date }).toDate() : expiresAt) < new Date()
         : false;
 
       return {

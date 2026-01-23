@@ -161,16 +161,22 @@ export default function SummaryMetrics({
           label: 'CTR',
           value: metrics?.ctr || 0,
           format: 'percentage' as const,
+          change: undefined,
+          icon: undefined,
         },
         {
           label: 'CPC',
           value: metrics?.cpc || 0,
           format: 'currency' as const,
+          change: undefined,
+          icon: undefined,
         },
         {
           label: 'CPA',
           value: metrics?.cpa || 0,
           format: 'currency' as const,
+          change: undefined,
+          icon: undefined,
         },
       ]
     : [];

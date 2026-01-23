@@ -262,9 +262,9 @@ export async function postJson<T>(
  */
 export function getCircuitBreakerStatus(): Record<string, CircuitBreakerState> {
   const status: Record<string, CircuitBreakerState> = {};
-  for (const [service, state] of circuitBreakers.entries()) {
+  circuitBreakers.forEach((state, service) => {
     status[service] = { ...state };
-  }
+  });
   return status;
 }
 
