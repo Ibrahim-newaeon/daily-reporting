@@ -11,7 +11,118 @@ This guide explains how to run the Daily Reports application locally using Docke
 
 2. **Git** (to clone the repository)
 
-## Quick Start
+---
+
+## Option 1: Using Docker Desktop GUI (Recommended for Beginners)
+
+### Step 1: Open Docker Desktop
+
+Launch Docker Desktop from your applications. Wait until the Docker icon shows "Docker Desktop is running".
+
+![Docker Desktop Running](https://docs.docker.com/desktop/images/docker-app-dashboard.webp)
+
+### Step 2: Open Terminal in Docker Desktop
+
+1. Click on **"Dev Environments"** in the left sidebar (or use the built-in terminal)
+2. Or click the **search bar** at the top and type `>terminal` then press Enter
+3. Or go to: **View → Terminal** (keyboard shortcut: `` Ctrl+` `` on Windows/Linux, `` Cmd+` `` on Mac)
+
+### Step 3: Navigate to Project Folder
+
+In the Docker Desktop terminal:
+
+```bash
+# Navigate to where you downloaded the project
+cd /path/to/daily-reporting
+
+# Example paths:
+# Windows: cd /c/Users/YourName/Projects/daily-reporting
+# Mac: cd /Users/YourName/Projects/daily-reporting
+# Linux: cd /home/yourname/projects/daily-reporting
+```
+
+### Step 4: Setup Environment
+
+```bash
+# Copy environment template
+cp .env.example .env
+```
+
+Then edit `.env` file with your Firebase credentials (use any text editor).
+
+### Step 5: Build and Run
+
+```bash
+# Build and start containers
+docker-compose -f docker-compose.local.yml up -d --build
+```
+
+### Step 6: View Running Containers
+
+1. Click **"Containers"** in Docker Desktop sidebar
+2. You should see:
+   - `daily-reports-local` (the app) - Status: Running
+   - `daily-reports-redis` (cache) - Status: Running
+
+### Step 7: Access the App
+
+1. In Docker Desktop, click on `daily-reports-local` container
+2. Click the **"Open in Browser"** button (or the port `3030:3030` link)
+3. Or manually open: **http://localhost:3030**
+
+### Step 8: View Logs
+
+1. Click on `daily-reports-local` container in Docker Desktop
+2. Click the **"Logs"** tab to see application output
+
+### Step 9: Stop the App
+
+1. In Docker Desktop **Containers** view
+2. Click the **Stop** button (square icon) next to the container group
+3. Or select containers and click **Delete** to remove them
+
+---
+
+## Option 2: Using Docker Desktop Terminal
+
+### Open Integrated Terminal
+
+**Method 1 - Keyboard Shortcut:**
+- Windows/Linux: Press `` Ctrl+` ``
+- Mac: Press `` Cmd+` ``
+
+**Method 2 - Menu:**
+- Go to **View** → **Terminal**
+
+**Method 3 - Search:**
+- Click the search bar at top
+- Type `>terminal`
+- Press Enter
+
+### Run Commands
+
+Once terminal is open:
+
+```bash
+# Navigate to project
+cd /path/to/daily-reporting
+
+# Setup (first time only)
+cp .env.example .env
+
+# Start the app
+docker-compose -f docker-compose.local.yml up -d --build
+
+# View logs
+docker-compose -f docker-compose.local.yml logs -f
+
+# Stop the app
+docker-compose -f docker-compose.local.yml down
+```
+
+---
+
+## Option 3: Command Line Quick Start
 
 ### 1. Clone the Repository
 
@@ -55,7 +166,26 @@ Open your browser and navigate to:
 http://localhost:3030
 ```
 
-## Available Commands
+---
+
+## Docker Desktop GUI Quick Reference
+
+| Task | How To |
+|------|--------|
+| **Open Terminal** | `Ctrl+`` (Windows/Linux) or `Cmd+`` (Mac) |
+| **View Containers** | Click "Containers" in left sidebar |
+| **Start Container** | Click ▶️ play button on container row |
+| **Stop Container** | Click ⏹️ stop button on container row |
+| **View Logs** | Click container name → "Logs" tab |
+| **Open in Browser** | Click port number (e.g., `3030:3030`) |
+| **Container Terminal** | Click container → "Terminal" tab |
+| **Delete Container** | Hover container → Click 🗑️ trash icon |
+| **View Files** | Click container → "Files" tab |
+| **Check Resources** | Click container → View CPU/Memory graphs |
+
+---
+
+## Script Commands
 
 | Command | Description |
 |---------|-------------|
