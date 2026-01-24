@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { InstallPrompt } from '@/components/PWA';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: 'chart-bar' },
@@ -152,8 +153,11 @@ export default function DashboardLayout({
         </header>
 
         {/* Page content */}
-        <main className="p-6">{children}</main>
+        <main className="p-6 pb-24">{children}</main>
       </div>
+
+      {/* PWA Install Prompt */}
+      <InstallPrompt />
     </div>
   );
 }
