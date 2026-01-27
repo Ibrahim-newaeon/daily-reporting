@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { getClientAuthInstance } from '@/lib/firebase';
+import { getClientAuthInstance } from '@/lib/firebase-client';
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 
 export default function LoginPage() {

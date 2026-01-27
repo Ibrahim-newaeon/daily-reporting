@@ -48,9 +48,9 @@ export async function query<T = Record<string, unknown>>(
   return rows as T[];
 }
 
-export async function insertRows(
+export async function insertRows<T extends object>(
   tableName: string,
-  rows: Record<string, unknown>[],
+  rows: T[],
   options: { skipInvalidRows?: boolean; ignoreUnknownValues?: boolean } = {}
 ): Promise<void> {
   const dataset = getDataset();

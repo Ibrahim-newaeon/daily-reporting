@@ -4,7 +4,10 @@
 # Stage 1: Dependencies
 # ============================================================================
 FROM node:20-alpine AS deps
+
+# Install libc6-compat for Alpine compatibility
 RUN apk add --no-cache libc6-compat
+
 WORKDIR /app
 
 # Copy package files
@@ -35,6 +38,21 @@ RUN npm run build
 # ============================================================================
 FROM node:20-alpine AS runner
 WORKDIR /app
+
+# Install Chromium for PDF generation with Puppeteer
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont \
+    font-noto-emoji \
+    --no-install-recommends
+
+# Set Puppeteer environment variables
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
 # Set environment variables
 ENV NODE_ENV=production

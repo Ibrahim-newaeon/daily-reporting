@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Reporting - Go-Live Plan</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; color: #333; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        header { background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%); color: white; padding: 40px 20px; margin-bottom: 30px; border-radius: 12px; }
+        header h1 { font-size: 2.5rem; margin-bottom: 10px; }
+        header p { opacity: 0.9; font-size: 1.1rem; }
+        .meta-info { display: flex; gap: 30px; margin-top: 20px; flex-wrap: wrap; }
+        .meta-item { background: rgba(255,255,255,0.15); padding: 10px 20px; border-radius: 8px; }
+        .meta-item strong { display: block; font-size: 0.85rem; opacity: 0.8; }
+        .meta-item span { font-size: 1.3rem; font-weight: 600; }
+
+        .timeline { position: relative; margin: 40px 0; }
+        .timeline::before { content: ''; position: absolute; left: 30px; top: 0; bottom: 0; width: 4px; background: #e0e0e0; border-radius: 2px; }
+
+        .phase { position: relative; margin-left: 70px; margin-bottom: 40px; }
+        .phase-marker { position: absolute; left: -52px; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; font-size: 1.1rem; }
+        .phase-marker.blocking { background: #dc3545; }
+        .phase-marker.high { background: #fd7e14; }
+        .phase-marker.medium { background: #ffc107; color: #333; }
+        .phase-marker.low { background: #28a745; }
+        .phase-marker.deploy { background: #6f42c1; }
+
+        .phase-content { background: white; border-radius: 12px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .phase-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
+        .phase-title { font-size: 1.4rem; font-weight: 600; color: #1a73e8; }
+        .phase-badge { padding: 5px 15px; border-radius: 20px; font-size: 0.85rem; font-weight: 500; }
+        .badge-blocking { background: #ffebee; color: #c62828; }
+        .badge-high { background: #fff3e0; color: #e65100; }
+        .badge-medium { background: #fff8e1; color: #f57f17; }
+        .badge-low { background: #e8f5e9; color: #2e7d32; }
+        .badge-deploy { background: #ede7f6; color: #4527a0; }
+
+        .task-list { list-style: none; margin-top: 15px; }
+        .task-item { padding: 15px; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 10px; }
+        .task-item:hover { border-color: #1a73e8; background: #f8f9ff; }
+        .task-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .task-name { font-weight: 600; color: #333; }
+        .task-effort { font-size: 0.85rem; color: #666; background: #f0f0f0; padding: 3px 10px; border-radius: 12px; }
+        .task-details { font-size: 0.95rem; color: #666; }
+        .task-file { font-family: monospace; font-size: 0.85rem; color: #1a73e8; background: #e3f2fd; padding: 2px 8px; border-radius: 4px; margin-top: 8px; display: inline-block; }
+
+        .code-block { background: #263238; color: #aed581; padding: 15px; border-radius: 8px; font-family: 'Fira Code', monospace; font-size: 0.9rem; overflow-x: auto; margin: 10px 0; }
+
+        .checklist { background: white; border-radius: 12px; padding: 25px; margin: 30px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .checklist h2 { color: #1a73e8; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #e0e0e0; }
+        .checklist-section { margin-bottom: 25px; }
+        .checklist-section h3 { font-size: 1.1rem; color: #333; margin-bottom: 10px; }
+        .checklist-item { display: flex; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+        .checklist-item:last-child { border-bottom: none; }
+        .checkbox { width: 20px; height: 20px; border: 2px solid #1a73e8; border-radius: 4px; margin-right: 12px; flex-shrink: 0; margin-top: 2px; }
+
+        .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 30px 0; }
+        .summary-card { background: white; border-radius: 12px; padding: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); text-align: center; }
+        .summary-card h3 { color: #666; font-size: 0.95rem; margin-bottom: 10px; }
+        .summary-card .value { font-size: 2.5rem; font-weight: 700; color: #1a73e8; }
+        .summary-card .sub { font-size: 0.9rem; color: #888; margin-top: 5px; }
+
+        .env-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        .env-table th, .env-table td { padding: 12px; text-align: left; border-bottom: 1px solid #e0e0e0; }
+        .env-table th { background: #f5f7fa; font-weight: 600; color: #333; }
+        .env-table code { background: #e3f2fd; padding: 2px 8px; border-radius: 4px; font-size: 0.9rem; }
+
+        .warning-box { background: #fff3e0; border-left: 4px solid #ff9800; padding: 15px 20px; border-radius: 0 8px 8px 0; margin: 20px 0; }
+        .warning-box strong { color: #e65100; }
+
+        .success-box { background: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px 20px; border-radius: 0 8px 8px 0; margin: 20px 0; }
+        .success-box strong { color: #2e7d32; }
+
+        .info-box { background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px 20px; border-radius: 0 8px 8px 0; margin: 20px 0; }
+        .info-box strong { color: #1565c0; }
+
+        .rollback-section { background: #ffebee; border-radius: 12px; padding: 25px; margin: 30px 0; }
+        .rollback-section h2 { color: #c62828; margin-bottom: 15px; }
+
+        @media (max-width: 768px) {
+            .timeline::before { left: 20px; }
+            .phase { margin-left: 50px; }
+            .phase-marker { left: -42px; width: 30px; height: 30px; font-size: 0.9rem; }
+            header h1 { font-size: 1.8rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Go-Live Plan</h1>
+            <p>Daily Reporting Application - Production Deployment Strategy</p>
+            <div class="meta-info">
+                <div class="meta-item">
+                    <strong>Current Readiness</strong>
+                    <span>69%</span>
+                </div>
+                <div class="meta-item">
+                    <strong>Target Readiness</strong>
+                    <span>95%+</span>
+                </div>
+                <div class="meta-item">
+                    <strong>Total Tasks</strong>
+                    <span>24</span>
+                </div>
+                <div class="meta-item">
+                    <strong>Blocking Issues</strong>
+                    <span>3</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="summary-cards">
+            <div class="summary-card">
+                <h3>Phase 1 - Blocking</h3>
+                <div class="value" style="color: #dc3545;">3</div>
+                <div class="sub">Critical fixes required</div>
+            </div>
+            <div class="summary-card">
+                <h3>Phase 2 - High Priority</h3>
+                <div class="value" style="color: #fd7e14;">5</div>
+                <div class="sub">Security & stability</div>
+            </div>
+            <div class="summary-card">
+                <h3>Phase 3 - Medium Priority</h3>
+                <div class="value" style="color: #ffc107;">8</div>
+                <div class="sub">Quality improvements</div>
+            </div>
+            <div class="summary-card">
+                <h3>Phase 4 - Deployment</h3>
+                <div class="value" style="color: #6f42c1;">8</div>
+                <div class="sub">Launch steps</div>
+            </div>
+        </div>
+
+        <div class="timeline">
+            <!-- Phase 1: Blocking Issues -->
+            <div class="phase">
+                <div class="phase-marker blocking">1</div>
+                <div class="phase-content">
+                    <div class="phase-header">
+                        <span class="phase-title">Phase 1: Fix Blocking Issues</span>
+                        <span class="phase-badge badge-blocking">MUST COMPLETE</span>
+                    </div>
+                    <p>These issues will prevent the application from functioning correctly in production.</p>
+
+                    <ul class="task-list">
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">1.1 Configure Puppeteer/Chromium for PDF Generation</span>
+                                <span class="task-effort">~2-4 hours</span>
+                            </div>
+                            <div class="task-details">
+                                Install and configure Chromium for headless PDF generation in Docker container.
+                            </div>
+                            <div class="code-block">
+# Option A: Add to Dockerfile
+RUN apt-get update && apt-get install -y \
+    chromium \
+    --no-install-recommends
+
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+# Option B: Use puppeteer with bundled Chromium
+npm install puppeteer
+                            </div>
+                            <span class="task-file">Dockerfile, lib/pdf-generator.ts</span>
+                        </li>
+
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">1.2 Implement Redis-Based Rate Limiting</span>
+                                <span class="task-effort">~3-4 hours</span>
+                            </div>
+                            <div class="task-details">
+                                Replace in-memory rate limiting with Redis for production scalability and persistence across server restarts.
+                            </div>
+                            <div class="code-block">
+# Install Redis client
+npm install ioredis @upstash/ratelimit
+
+# Add to docker-compose.yml
+redis:
+  image: redis:7-alpine
+  ports:
+    - "6379:6379"
+  volumes:
+    - redis_data:/data
+                            </div>
+                            <span class="task-file">lib/rate-limiter.ts, docker-compose.yml</span>
+                        </li>
+
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">1.3 Ensure Node.js 18+ Runtime</span>
+                                <span class="task-effort">~30 minutes</span>
+                            </div>
+                            <div class="task-details">
+                                Verify production environment runs Node.js 18+ for native fetch API support. Update Dockerfile and document requirements.
+                            </div>
+                            <div class="code-block">
+# In Dockerfile (already configured)
+FROM node:20-alpine AS base
+
+# Add to package.json
+"engines": {
+  "node": ">=18.0.0"
+}
+                            </div>
+                            <span class="task-file">Dockerfile, package.json</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Phase 2: High Priority -->
+            <div class="phase">
+                <div class="phase-marker high">2</div>
+                <div class="phase-content">
+                    <div class="phase-header">
+                        <span class="phase-title">Phase 2: High Priority Security & Stability</span>
+                        <span class="phase-badge badge-high">RECOMMENDED</span>
+                    </div>
+                    <p>Important security hardening and stability improvements for production.</p>
+
+                    <ul class="task-list">
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">2.1 Add Content Security Policy Headers</span>
+                                <span class="task-effort">~1-2 hours</span>
+                            </div>
+                            <div class="task-details">
+                                Implement strict CSP headers to prevent XSS attacks.
+                            </div>
+                            <div class="code-block">
+// next.config.js
+async headers() {
+  return [{
+    source: '/(.*)',
+    headers: [
+      {
+        key: 'Content-Security-Policy',
+        value: "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com;"
+      },
+      { key: 'X-Frame-Options', value: 'DENY' },
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' }
+    ]
+  }]
+}
+                            </div>
+                            <span class="task-file">next.config.js</span>
+                        </li>
+
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">2.2 Implement Request Timeout Handling</span>
+                                <span class="task-effort">~1 hour</span>
+                            </div>
+                            <div class="task-details">
+                                Add timeout handling to all external API calls (Google Ads, Meta, TikTok, Snap).
+                            </div>
+                            <div class="code-block">
+// lib/api-client.ts
+const controller = new AbortController();
+const timeout = setTimeout(() => controller.abort(), 30000);
+
+try {
+  const response = await fetch(url, {
+    signal: controller.signal,
+    ...options
+  });
+} finally {
+  clearTimeout(timeout);
+}
+                            </div>
+                            <span class="task-file">lib/google-ads.ts, lib/meta-ads.ts, lib/tiktok-ads.ts, lib/snap-ads.ts</span>
+                        </li>
+
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">2.3 Add Circuit Breaker Pattern</span>
+                                <span class="task-effort">~2-3 hours</span>
+                            </div>
+                            <div class="task-details">
+                                Implement circuit breaker for external API calls to handle failures gracefully.
+                            </div>
+                            <div class="code-block">
+npm install cockatiel
+
+// lib/circuit-breaker.ts
+import { CircuitBreakerPolicy, ConsecutiveBreaker } from 'cockatiel';
+
+export const apiCircuitBreaker = new CircuitBreakerPolicy({
+  breaker: new ConsecutiveBreaker(5), // Open after 5 failures
+  halfOpenAfter: 30000 // Try again after 30s
+});
+                            </div>
+                            <span class="task-file">lib/circuit-breaker.ts</span>
+                        </li>
+
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">2.4 Enable Firestore Security Rules</span>
+                                <span class="task-effort">~1-2 hours</span>
+                            </div>
+                            <div class="task-details">
+                                Deploy production Firestore security rules with proper user isolation.
+                            </div>
+                            <div class="code-block">
+// firestore.rules
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    match /tokens/{tokenId} {
+      allow read, write: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+    match /reports/{reportId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow write: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+  }
+}
+                            </div>
+                            <span class="task-file">firestore.rules</span>
+                        </li>
+
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">2.5 Set Up Error Monitoring</span>
+                                <span class="task-effort">~1-2 hours</span>
+                            </div>
+                            <div class="task-details">
+                                Integrate error monitoring service (Sentry recommended) for production visibility.
+                            </div>
+                            <div class="code-block">
+npm install @sentry/nextjs
+
+// sentry.client.config.ts
+import * as Sentry from '@sentry/nextjs';
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  tracesSampleRate: 0.1,
+  environment: process.env.NODE_ENV
+});
+                            </div>
+                            <span class="task-file">sentry.client.config.ts, sentry.server.config.ts</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Phase 3: Medium Priority -->
+            <div class="phase">
+                <div class="phase-marker medium">3</div>
+                <div class="phase-content">
+                    <div class="phase-header">
+                        <span class="phase-title">Phase 3: Quality & Performance Improvements</span>
+                        <span class="phase-badge badge-medium">NICE TO HAVE</span>
+                    </div>
+                    <p>Improvements for better user experience and maintainability.</p>
+
+                    <ul class="task-list">
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">3.1 Improve Form Accessibility</span>
+                                <span class="task-effort">~2-3 hours</span>
+                            </div>
+                            <div class="task-details">
+                                Add ARIA labels, error announcements, and keyboard navigation to all forms.
+                            </div>
+                            <span class="task-file">components/forms/*.tsx</span>
+                        </li>
+
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">3.2 Add Loading States & Skeletons</span>
+                                <span class="task-effort">~2 hours</span>
+                            </div>
+                            <div class="task-details">
+                                Implement skeleton loaders for better perceived performance.
+                            </div>
+                            <span class="task-file">components/ui/skeleton.tsx</span>
+                        </li>
+
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">3.3 Implement Client-Side Caching</span>
+                                <span class="task-effort">~2-3 hours</span>
+                            </div>
+                            <div class="task-details">
+                                Add SWR or React Query for client-side data caching and optimistic updates.
+                            </div>
+                            <span class="task-file">lib/api-hooks.ts</span>
+                        </li>
+
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">3.4 Add Password Strength Indicator</span>
+                                <span class="task-effort">~1 hour</span>
+                            </div>
+                            <div class="task-details">
+                                Visual password strength meter on signup/password change forms.
+                            </div>
+                            <span class="task-file">components/auth/password-input.tsx</span>
+                        </li>
+
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">3.5 Improve Mobile Responsiveness</span>
+                                <span class="task-effort">~3-4 hours</span>
+                            </div>
+                            <div class="task-details">
+                                Optimize layouts and touch targets for mobile devices.
+                            </div>
+                            <span class="task-file">app/**/*.tsx, styles/globals.css</span>
+                        </li>
+
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">3.6 Add Unit Tests for Critical Paths</span>
+                                <span class="task-effort">~4-6 hours</span>
+                            </div>
+                            <div class="task-details">
+                                Write tests for authentication, token encryption, and API integrations.
+                            </div>
+                            <span class="task-file">__tests__/**/*.test.ts</span>
+                        </li>
+
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">3.7 Add API Documentation</span>
+                                <span class="task-effort">~2-3 hours</span>
+                            </div>
+                            <div class="task-details">
+                                Document all API endpoints with request/response schemas.
+                            </div>
+                            <span class="task-file">docs/api-documentation.md</span>
+                        </li>
+
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">3.8 Set Up Health Check Endpoint</span>
+                                <span class="task-effort">~30 minutes</span>
+                            </div>
+                            <div class="task-details">
+                                Create /api/health endpoint for load balancer and monitoring.
+                            </div>
+                            <div class="code-block">
+// app/api/health/route.ts
+export async function GET() {
+  return Response.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    version: process.env.APP_VERSION || '1.0.0'
+  });
+}
+                            </div>
+                            <span class="task-file">app/api/health/route.ts</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Phase 4: Deployment -->
+            <div class="phase">
+                <div class="phase-marker deploy">4</div>
+                <div class="phase-content">
+                    <div class="phase-header">
+                        <span class="phase-title">Phase 4: Production Deployment</span>
+                        <span class="phase-badge badge-deploy">FINAL STEPS</span>
+                    </div>
+                    <p>Steps to deploy and launch in production environment.</p>
+
+                    <ul class="task-list">
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">4.1 Set Up Production Environment Variables</span>
+                                <span class="task-effort">~1 hour</span>
+                            </div>
+                            <div class="task-details">
+                                Configure all production environment variables securely.
+                            </div>
+
+                            <table class="env-table">
+                                <thead>
+                                    <tr>
+                                        <th>Variable</th>
+                                        <th>Description</th>
+                                        <th>Required</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>NEXTAUTH_URL</code></td>
+                                        <td>Production URL (https://yourdomain.com)</td>
+                                        <td>Yes</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>NEXTAUTH_SECRET</code></td>
+                                        <td>32+ character random string</td>
+                                        <td>Yes</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>TOKEN_ENCRYPTION_KEY</code></td>
+                                        <td>64 hex characters (32 bytes)</td>
+                                        <td>Yes</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>FIREBASE_*</code></td>
+                                        <td>Firebase project credentials</td>
+                                        <td>Yes</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>GOOGLE_*</code></td>
+                                        <td>Google OAuth & Ads API credentials</td>
+                                        <td>Yes</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>META_*</code></td>
+                                        <td>Meta/Facebook API credentials</td>
+                                        <td>Optional</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>TIKTOK_*</code></td>
+                                        <td>TikTok API credentials</td>
+                                        <td>Optional</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>SNAP_*</code></td>
+                                        <td>Snapchat API credentials</td>
+                                        <td>Optional</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>REDIS_URL</code></td>
+                                        <td>Redis connection string</td>
+                                        <td>Yes</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>SENTRY_DSN</code></td>
+                                        <td>Sentry error tracking DSN</td>
+                                        <td>Recommended</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </li>
+
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">4.2 Configure Firebase Production Project</span>
+                                <span class="task-effort">~1 hour</span>
+                            </div>
+                            <div class="task-details">
+                                Set up separate Firebase project for production with security rules.
+                            </div>
+                        </li>
+
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">4.3 Set Up OAuth Redirect URIs</span>
+                                <span class="task-effort">~30 minutes</span>
+                            </div>
+                            <div class="task-details">
+                                Add production URLs to OAuth app configurations for all platforms.
+                            </div>
+                            <div class="warning-box">
+                                <strong>Important:</strong> Update redirect URIs in Google Cloud Console, Meta Developer Portal, TikTok Developer Portal, and Snap Business Manager.
+                            </div>
+                        </li>
+
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">4.4 Build & Test Docker Image</span>
+                                <span class="task-effort">~30 minutes</span>
+                            </div>
+                            <div class="task-details">
+                                Build production Docker image and test locally.
+                            </div>
+                            <div class="code-block">
+# Build image
+docker build -t daily-reporting:latest .
+
+# Run locally with production config
+docker-compose -f docker-compose.yml up -d
+
+# Test health endpoint
+curl http://localhost:3030/api/health
+
+# Run smoke tests
+npm run test:e2e
+                            </div>
+                        </li>
+
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">4.5 Deploy to Production Infrastructure</span>
+                                <span class="task-effort">~1-2 hours</span>
+                            </div>
+                            <div class="task-details">
+                                Deploy to your chosen platform (Vercel, AWS, GCP, etc.).
+                            </div>
+                            <div class="code-block">
+# Option A: Vercel (Recommended for Next.js)
+vercel --prod
+
+# Option B: Docker to Cloud Run
+gcloud run deploy daily-reporting \
+  --image gcr.io/PROJECT_ID/daily-reporting \
+  --platform managed \
+  --region us-central1 \
+  --allow-unauthenticated
+
+# Option C: Docker to AWS ECS
+aws ecs update-service --cluster prod --service daily-reporting --force-new-deployment
+                            </div>
+                        </li>
+
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">4.6 Configure SSL/TLS Certificate</span>
+                                <span class="task-effort">~30 minutes</span>
+                            </div>
+                            <div class="task-details">
+                                Ensure HTTPS is properly configured with valid SSL certificate.
+                            </div>
+                        </li>
+
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">4.7 Set Up Monitoring & Alerts</span>
+                                <span class="task-effort">~1 hour</span>
+                            </div>
+                            <div class="task-details">
+                                Configure uptime monitoring and alerting for critical issues.
+                            </div>
+                            <div class="info-box">
+                                <strong>Recommended Tools:</strong> UptimeRobot or Pingdom for uptime, Sentry for errors, CloudWatch/Stackdriver for infrastructure.
+                            </div>
+                        </li>
+
+                        <li class="task-item">
+                            <div class="task-header">
+                                <span class="task-name">4.8 Verify Production Deployment</span>
+                                <span class="task-effort">~1 hour</span>
+                            </div>
+                            <div class="task-details">
+                                Run through complete user flows in production.
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pre-Deployment Checklist -->
+        <div class="checklist">
+            <h2>Pre-Deployment Checklist</h2>
+
+            <div class="checklist-section">
+                <h3>Security</h3>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>All API tokens encrypted with AES-256-GCM</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>OAuth state parameter signed with HMAC</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>SQL/NoSQL injection prevented via parameterized queries</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>XSS prevention with proper output encoding</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>CSRF protection on state-changing endpoints</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Rate limiting configured and tested</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Security headers (CSP, X-Frame-Options, etc.) configured</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Firestore security rules deployed</span>
+                </div>
+            </div>
+
+            <div class="checklist-section">
+                <h3>Environment</h3>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>All required environment variables set</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Production Firebase project configured</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>OAuth redirect URIs updated for production domain</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Redis/cache server accessible</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Node.js 18+ runtime confirmed</span>
+                </div>
+            </div>
+
+            <div class="checklist-section">
+                <h3>Functionality</h3>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>User registration and login working</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>OAuth flows for all platforms tested</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Report generation working</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>PDF export working (if Chromium configured)</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Email notifications working (if configured)</span>
+                </div>
+            </div>
+
+            <div class="checklist-section">
+                <h3>Monitoring</h3>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Error tracking (Sentry) configured</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Uptime monitoring configured</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Alert notifications configured</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Health check endpoint verified</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rollback Plan -->
+        <div class="rollback-section">
+            <h2>Rollback Plan</h2>
+            <p>In case of critical issues after deployment:</p>
+
+            <div class="code-block">
+# 1. Quick rollback to previous version
+# For Vercel:
+vercel rollback
+
+# For Docker:
+docker-compose down
+docker tag daily-reporting:previous daily-reporting:latest
+docker-compose up -d
+
+# For Kubernetes:
+kubectl rollout undo deployment/daily-reporting
+
+# 2. Verify rollback
+curl https://yourdomain.com/api/health
+
+# 3. Investigate issues in staging environment
+# 4. Fix issues and redeploy when ready
+            </div>
+
+            <div class="warning-box">
+                <strong>Important:</strong> Always keep the previous working version tagged and accessible for quick rollback. Test rollback procedures before go-live.
+            </div>
+        </div>
+
+        <!-- Post-Launch -->
+        <div class="checklist">
+            <h2>Post-Launch Monitoring (First 48 Hours)</h2>
+
+            <div class="checklist-section">
+                <h3>Hour 1-4</h3>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Monitor error rates in Sentry</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Check server response times</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Verify OAuth flows working</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Test critical user paths manually</span>
+                </div>
+            </div>
+
+            <div class="checklist-section">
+                <h3>Hour 4-24</h3>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Review error logs for patterns</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Monitor memory and CPU usage</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Check rate limiting is working correctly</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Verify scheduled jobs running (if any)</span>
+                </div>
+            </div>
+
+            <div class="checklist-section">
+                <h3>Hour 24-48</h3>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Analyze user feedback</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Review performance metrics</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Plan fixes for any discovered issues</span>
+                </div>
+                <div class="checklist-item">
+                    <div class="checkbox"></div>
+                    <span>Document lessons learned</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="success-box">
+            <strong>Success Criteria:</strong> The application is considered successfully launched when:
+            <ul style="margin-top: 10px; margin-left: 20px;">
+                <li>Error rate is below 1% for 24 hours</li>
+                <li>All OAuth integrations functioning</li>
+                <li>Response times under 2 seconds for 95th percentile</li>
+                <li>No critical security vulnerabilities reported</li>
+                <li>Users can complete full reporting workflow</li>
+            </ul>
+        </div>
+
+        <footer style="text-align: center; padding: 40px 20px; color: #666; border-top: 1px solid #e0e0e0; margin-top: 40px;">
+            <p>Daily Reporting Go-Live Plan | Generated: January 23, 2026</p>
+            <p style="margin-top: 10px; font-size: 0.9rem;">Based on Go-Live Audit Report (69% Readiness)</p>
+        </footer>
+    </div>
+</body>
+</html>

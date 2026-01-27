@@ -81,7 +81,7 @@ export class GA4Client {
           dateRanges: [{ startDate, endDate }],
           metrics: metrics.map(m => ({ name: m })),
           dimensions: dimensions.map(d => ({ name: d })),
-          limit: 10000,
+          limit: '10000',
         },
       });
 

@@ -34,6 +34,9 @@ export interface PlatformConnection {
   accountId?: string;
   accountName?: string;
   propertyId?: string; // For GA4
+  tokenEncrypted?: boolean; // Whether tokens are encrypted at rest
+  expired?: boolean; // Whether token has expired
+  needsReauth?: boolean; // Whether user needs to re-authenticate
 }
 
 export interface UserSettings {
