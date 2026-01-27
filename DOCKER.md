@@ -127,7 +127,7 @@ docker-compose -f docker-compose.local.yml down
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-org/daily-reporting.git
+git clone https://github.com/Ibrahim-newaeon/daily-reporting.git
 cd daily-reporting
 ```
 
